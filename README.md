@@ -35,6 +35,13 @@ Computer Security/
 
 ### 1. Database
 
+The application uses **local PostgreSQL as its primary database**. Set
+`LOCAL_DATABASE_URL` in `backend/.env` to your local PostgreSQL connection.
+Set the existing Supabase connection string as `SUPABASE_DATABASE_URL` in
+`backend/.env`. The application deliberately ignores
+`DATABASE_URL`, so a leftover Supabase URL cannot silently remain the
+application's write target.
+
 ```powershell
 # Create the database
 psql -U postgres -c "CREATE DATABASE enterprise_auth;"
@@ -42,6 +49,11 @@ psql -U postgres -c "CREATE DATABASE enterprise_auth;"
 # Apply the schema
 psql -U postgres -d enterprise_auth -f "database/schema.sql"
 ```
+
+Run `schema.sql` only against a **new, empty local database**: it drops and
+recreates the `users` and `audit_logs` tables. The existing Supabase data remains
+unchanged, but the local database will not contain that data until the
+bootstrap step below.
 
 ### 2. Backend
 
@@ -65,10 +77,36 @@ node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 # BACKUP_ENCRYPTION_KEY (64 hex chars)
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-### 3. Create the first Administrator
+Install Google Drive for desktop, sign in to the Google account where you want
+backups, and choose **Mirror files**. Create a dedicated folder inside the
+mirrored Drive directory and set `GOOGLE_DRIVE_SYNC_DIR` in `backend/.env` to
+that folder's absolute Windows path. No Google Cloud project, OAuth client, or
+API credentials are needed.
+
+### 3. Import existing Supabase data and enable synchronization
+
+The local database must have the application schema and empty `users` and
+`audit_logs` tables. From the `backend` folder, run this one-time bootstrap
+while connected to the internet:
+
+```powershell
+npm run sync:bootstrap
+```
+
+This installs non-destructive sync triggers on both databases and copies the
+existing Supabase `users` and `audit_logs` rows locally. It refuses to overwrite
+local rows. Thereafter, the backend synchronizes queued changes in both
+directions once a minute by default. Password/2FA setup and login require
+Supabase to be reachable; already-issued access tokens can continue to be used
+against the local app until they expire.
+
+### 4. Create the first Administrator, if needed
+
+The bootstrap copies existing accounts too. Seed an administrator only if
+Supabase did not already have one:
 
 ```powershell
 npm run seed
@@ -76,7 +114,7 @@ npm run seed
 
 Follow the interactive prompts to set username, email, and password.
 
-### 4. Start the backend
+### 5. Start the backend
 
 ```powershell
 npm run dev      # Development (with nodemon)
@@ -86,7 +124,7 @@ npm start        # Production
 
 Server starts at `http://localhost:5000`
 
-### 5. Frontend
+### 6. Frontend
 
 ```powershell
 cd ../frontend
@@ -147,23 +185,88 @@ cd backend
 npm run backup
 ```
 
-Encrypted backups appear in `backend/backups/backup-<timestamp>.sql.enc`
+The command creates an authenticated AES-256-GCM encrypted dump in
+`backend/backups/` and copies the same encrypted file into the mirrored Google
+Drive folder. Google Drive for desktop uploads it to the cloud in the
+background; the application confirms the local copy, not completion of that
+cloud upload. Backups older than `BACKUP_RETENTION_DAYS` are pruned from both
+folders. The
+file format is a 12-byte IV, encrypted SQL bytes, then a 16-byte authentication
+tag. Keep `BACKUP_ENCRYPTION_KEY` separately; without it backups cannot be
+restored. The cron runs daily at midnight by default.
 
-**To decrypt manually:**
+To decrypt a current GCM backup before restoring it with `psql`, run this from
+the backend folder and choose a secure output path for the plaintext SQL:
 
 ```js
 const crypto = require('crypto');
 const fs = require('fs');
-const encKey = Buffer.from(process.env.BACKUP_ENCRYPTION_KEY, 'hex');
-const fileBuffer = fs.readFileSync('backup-<ts>.sql.enc');
-const iv = fileBuffer.slice(0, 16);
-const encrypted = fileBuffer.slice(16);
-const decipher = crypto.createDecipheriv('aes-256-cbc', encKey, iv);
-const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()]);
-fs.writeFileSync('restored.sql', decrypted);
+require('dotenv').config();
+const file = fs.readFileSync(process.argv[2]);
+const key = Buffer.from(process.env.BACKUP_ENCRYPTION_KEY, 'hex');
+const iv = file.subarray(0, 12);
+const tag = file.subarray(file.length - 16);
+const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+decipher.setAuthTag(tag);
+const sql = Buffer.concat([
+  decipher.update(file.subarray(12, file.length - 16)),
+  decipher.final(),
+]);
+fs.writeFileSync(process.argv[3], sql, { mode: 0o600 });
 ```
 
-The cron automatically runs daily at midnight and prunes backups older than 30 days.
+For example, save the snippet as a temporary local script and run
+`node decrypt.js backups/backup-<timestamp>.sql.enc restored.sql`, then restore
+with `psql -U postgres -d enterprise_auth -f restored.sql`. Securely remove the
+plaintext SQL after use. Backups created by the older AES-256-CBC implementation
+use a different format and need its previous decryption instructions.
+
+## 🔄 Supabase Synchronization
+
+Changes to `users` and `audit_logs` are captured in a PostgreSQL outbox on each
+database. Sync applies acknowledged changes idempotently and prevents
+echo-triggered changes from being re-queued. Concurrent edits and account
+uniqueness conflicts are preserved for review instead of silently overwriting
+a row.
+
+Administrators can review and resolve conflicts in the app under **Sync
+Conflicts**, or via `GET /api/sync/conflicts` and
+`POST /api/sync/conflicts/:id/resolve` (`resolution` is `local` or `supabase`).
+The selected version is queued to propagate to both databases.
+
+`database/sync.sql` is a non-destructive migration installed by
+`npm run sync:bootstrap`; do not rerun `database/schema.sql` against Supabase.
+Synchronization currently covers only `users` and `audit_logs`. New tables
+need matching change capture and conflict handling before they can be used
+offline.
+
+## ☁️ Deploying the hosted app to Vercel
+
+Deploy this repository as **two Vercel projects** so the Vite frontend and
+Express API can use their appropriate build/runtime settings:
+
+1. Import this Git repository into Vercel twice.
+2. For the frontend project, set **Root Directory** to `frontend` and deploy
+   with the Vite defaults. Add `VITE_API_URL` as
+   `https://<your-backend-project>.vercel.app/api` and set
+   `VITE_LOCAL_SYNC_ENABLED` to `false`.
+3. For the backend project, set **Root Directory** to `backend`. Its
+   `api/index.js` serverless entry serves Express through the rewrite in
+   `backend/vercel.json`. The serverless instance connects to Supabase and does
+   not start the local sync or backup cron jobs.
+4. Add the backend environment variables in the Vercel project settings:
+   `DATABASE_URL` and `SUPABASE_DATABASE_URL` (the Supabase PostgreSQL
+   connection string), `JWT_SECRET`, `SECRET_PEPPER`, `JWT_EXPIRES_IN`,
+   `JWT_2FA_PENDING_EXPIRES_IN`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and
+   `FRONTEND_URL` (the deployed frontend's HTTPS URL).
+5. Keep the existing local `.env` private. Do not add local database settings,
+   Google Drive paths, or database credentials to the frontend project.
+
+Vercel cannot connect to PostgreSQL on your computer. The hosted site uses
+Supabase while the local development server continues using local PostgreSQL
+and synchronizing changes to Supabase. Keep the local server online to continue
+local sync; Vercel does not run `pg_dump`, scheduled backups, or the local
+Google Drive for desktop backup job.
 
 ---
 
@@ -179,7 +282,9 @@ The cron automatically runs daily at midnight and prunes backups older than 30 d
 | Rate limiting | 10 auth attempts per 15 min per IP |
 | Security headers | Helmet.js |
 | SQL injection | Parameterised queries (`pg` pool) |
-| Backup encryption | AES-256-CBC with random per-backup IV |
+| Backup encryption | AES-256-GCM with random per-backup IV and authentication tag |
+| Backup destination | Local encrypted copy plus Google Drive for desktop mirror |
+| Offline access | Existing JWT sessions work locally; login and 2FA require Supabase connectivity |
 | Audit logging | All auth events + role changes written to `audit_logs` |
 
 ---
@@ -200,4 +305,6 @@ The cron automatically runs daily at midnight and prunes backups older than 30 d
 | DELETE | `/api/users/:id` | JWT | Admin, Administrator |
 | PATCH | `/api/users/:id/role` | JWT | Administrator |
 | GET  | `/api/users/logs/audit` | JWT | Administrator |
+| GET  | `/api/sync/conflicts` | JWT | Administrator |
+| POST | `/api/sync/conflicts/:id/resolve` | JWT | Administrator |
 | GET  | `/health` | None | — |

@@ -1,7 +1,7 @@
 // src/components/Sidebar.jsx
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, ScrollText, LogOut, Shield, ChevronLeft, ChevronRight,
+  LayoutDashboard, Users, ScrollText, LogOut, Shield, ChevronLeft, ChevronRight, AlertTriangle,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -20,6 +20,8 @@ const ROLE_LABELS = {
   administrator: 'Administrator',
 };
 
+const localSyncEnabled = import.meta.env.VITE_LOCAL_SYNC_ENABLED !== 'false';
+
 export default function Sidebar() {
   const { user, logout, hasRole } = useAuth();
   const navigate                  = useNavigate();
@@ -29,6 +31,9 @@ export default function Sidebar() {
     { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard',       always: true },
     { to: '/users',           icon: Users,            label: 'User Management', roles: ['manager', 'admin', 'administrator'] },
     { to: '/audit',           icon: ScrollText,       label: 'Audit Logs',      roles: ['administrator'] },
+    ...(localSyncEnabled
+      ? [{ to: '/sync-conflicts', icon: AlertTriangle, label: 'Sync Conflicts', roles: ['administrator'] }]
+      : []),
   ].filter(item => item.always || hasRole(...(item.roles || [])));
 
   const handleLogout = async () => {

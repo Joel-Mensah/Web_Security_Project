@@ -8,6 +8,8 @@
     "dev": "nodemon server.js",
     "seed": "node src/scripts/seed.js",
     "backup": "node src/scripts/backup.js --now",
+    "sync:bootstrap": "node src/services/syncService.js --bootstrap",
+    "sync:now": "node src/services/syncService.js",
     "test": "jest --forceExit"
   },
   "dependencies": {

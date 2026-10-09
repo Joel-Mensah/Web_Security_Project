@@ -6,6 +6,9 @@ import Sidebar         from './components/Sidebar';
 import LoginPage       from './pages/LoginPage';
 import DashboardPage   from './pages/DashboardPage';
 import UserManagementPage from './pages/UserManagementPage';
+import SyncConflictsPage from './pages/SyncConflictsPage';
+
+const localSyncEnabled = import.meta.env.VITE_LOCAL_SYNC_ENABLED !== 'false';
 
 // Layout wrapper for authenticated pages
 function AppLayout() {
@@ -44,6 +47,16 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            {localSyncEnabled && (
+              <Route
+                path="/sync-conflicts"
+                element={
+                  <ProtectedRoute roles={['administrator']}>
+                    <SyncConflictsPage />
+                  </ProtectedRoute>
+                }
+              />
+            )}
           </Route>
 
           <Route path="*" element={<Navigate to="/dashboard" replace />} />

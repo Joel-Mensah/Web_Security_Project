@@ -11,8 +11,10 @@ const rateLimit   = require('express-rate-limit');
 
 const authRouter  = require('./src/routes/auth');
 const usersRouter = require('./src/routes/users');
+const syncRouter  = require('./src/routes/sync');
 const { pool }    = require('./src/config/db');
 const { startBackupCron } = require('./src/scripts/backup');
+const { startSyncCron } = require('./src/services/syncService');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
@@ -75,6 +77,7 @@ app.get('/', (_req, res) => {
 // ─── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/auth',  authLimiter, authRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/sync',  syncRouter);
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -100,14 +103,31 @@ async function start() {
     process.exit(1);
   }
 
+  try {
+    await startSyncCron();
+  } catch (err) {
+    console.error('[SYNC] Cannot start synchronization. Check the local setup.');
+    console.error(err.message);
+    process.exit(1);
+  }
+
+  try {
+    startBackupCron();
+  } catch (err) {
+    console.error('[BACKUP] Cannot start scheduled backups. Check backup configuration.');
+    console.error(err.message);
+    process.exit(1);
+  }
+
   app.listen(PORT, () => {
     console.log(`\n🚀 Server running on http://localhost:${PORT}`);
     console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`   CORS origin: ${process.env.FRONTEND_URL || 'http://localhost:5173'}\n`);
   });
-
-  // Start encrypted backup cron
-  startBackupCron();
 }
 
-start();
+if (require.main === module) {
+  start();
+}
+
+module.exports = app;

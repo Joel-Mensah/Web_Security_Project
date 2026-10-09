@@ -13,6 +13,7 @@ const { generateOTP, hashOTP, verifyOTP } = require('../services/otpService');
 const { sendOTP }        = require('../services/emailService');
 const { log, AuditAction } = require('../services/auditService');
 const authenticate       = require('../middleware/authenticate');
+const { requireCloudForAuth } = require('../services/syncService');
 
 const router = express.Router();
 
@@ -30,6 +31,7 @@ function getIp(req) {
 // Step 1: Validate username + password → issue short-lived "pending 2FA" token
 router.post(
   '/login',
+  requireCloudForAuth,
   [
     body('username').trim().notEmpty().withMessage('Username is required'),
     body('password').notEmpty().withMessage('Password is required'),
@@ -90,7 +92,7 @@ router.post(
 
 // ─── POST /api/auth/setup-2fa ────────────────────────────────────────────────
 // First-time: generate + store TOTP secret, return QR code
-router.post('/setup-2fa', async (req, res) => {
+router.post('/setup-2fa', requireCloudForAuth, async (req, res) => {
   const authHeader = req.headers['authorization'];
   if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ message: 'No token' });
 
@@ -127,6 +129,7 @@ router.post('/setup-2fa', async (req, res) => {
 // Step 2: Verify TOTP → issue full JWT
 router.post(
   '/verify-2fa',
+  requireCloudForAuth,
   [body('token').trim().isLength({ min: 6, max: 6 }).withMessage('Token must be 6 digits')],
   async (req, res) => {
     const errors = validationResult(req);
@@ -191,7 +194,7 @@ function maskEmail(email) {
 
 // ─── POST /api/auth/send-email-otp ─────────────────────────────────────────────
 // Request an email OTP when TOTP is unavailable / as backup
-router.post('/send-email-otp', async (req, res) => {
+router.post('/send-email-otp', requireCloudForAuth, async (req, res) => {
   const authHeader = req.headers['authorization'];
   if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ message: 'No pending token' });
 
@@ -250,6 +253,7 @@ router.post('/send-email-otp', async (req, res) => {
 // Verify the 6-digit email OTP and issue full JWT
 router.post(
   '/verify-email-otp',
+  requireCloudForAuth,
   [body('token').trim().isLength({ min: 6, max: 6 }).withMessage('Token must be 6 digits')],
   async (req, res) => {
     const errors = validationResult(req);

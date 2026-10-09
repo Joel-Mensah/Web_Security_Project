@@ -5,11 +5,20 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+function getGmailCredentials() {
+  const user = process.env.GMAIL_USER || '';
+  const pass = (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, '');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user) || pass.length !== 16) {
+    throw new Error('Set a valid GMAIL_USER and 16-character GMAIL_APP_PASSWORD in backend/.env');
+  }
+  return { user, pass };
+}
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
     user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
+    pass: (process.env.GMAIL_APP_PASSWORD || '').replace(/\s+/g, ''),
   },
 });
 
@@ -21,13 +30,10 @@ const transporter = nodemailer.createTransport({
  * @returns {Promise<object>} Nodemailer send result
  */
 async function sendOTP(toEmail, otp) {
-  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-    console.warn('[EMAIL] GMAIL_USER or GMAIL_APP_PASSWORD is not configured. Email OTP delivery skipped.');
-    throw new Error('Email service is not configured on the server. Please contact an administrator.');
-  }
+  const { user } = getGmailCredentials();
 
   const mailOptions = {
-    from: `"Enterprise Security Portal" <${process.env.GMAIL_USER}>`,
+    from: `"Enterprise Security Portal" <${user}>`,
     to: toEmail,
     subject: 'Your 2FA Verification Code',
     text: `Your security verification code is: ${otp}\n\nThis code will expire in 10 minutes. If you did not request this login code, please notify your system administrator immediately.`,
@@ -54,4 +60,9 @@ async function sendOTP(toEmail, otp) {
   return transporter.sendMail(mailOptions);
 }
 
-module.exports = { sendOTP };
+async function verifyEmailService() {
+  getGmailCredentials();
+  await transporter.verify();
+}
+
+module.exports = { sendOTP, verifyEmailService };
