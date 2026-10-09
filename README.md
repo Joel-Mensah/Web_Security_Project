@@ -240,6 +240,20 @@ Synchronization currently covers only `users` and `audit_logs`. New tables
 need matching change capture and conflict handling before they can be used
 offline.
 
+## ✉️ New-user password setup emails
+
+When creating a user, administrators and managers can choose **Send Setup
+Link**. The email includes the user's username and a single-use password setup
+link that expires after 30 minutes. The user chooses their own password; no
+password is sent by email. The temporary token is stored only as a SHA-256 hash
+and is synchronized to Supabase before the email is delivered. After setting a
+password, the user signs in and completes the existing TOTP/Email OTP setup.
+
+Set `ACCOUNT_SETUP_URL` to the public frontend origin when local administrators
+send invitations for the hosted site (for example, the Vercel frontend URL).
+When omitted, the email link uses `FRONTEND_URL`. The Gmail sender's
+`GMAIL_USER` and `GMAIL_APP_PASSWORD` must be configured.
+
 ## ☁️ Deploying the hosted app to Vercel
 
 Deploy this repository as **two Vercel projects** so the Vite frontend and
@@ -298,10 +312,12 @@ Google Drive for desktop backup job.
 | POST | `/api/auth/verify-2fa` | Pending JWT | — |
 | POST | `/api/auth/send-email-otp` | Pending JWT | — |
 | POST | `/api/auth/verify-email-otp` | Pending JWT | — |
+| POST | `/api/auth/setup-password` | Setup token | — |
 | POST | `/api/auth/logout` | JWT | Any |
 | GET  | `/api/auth/me` | JWT | Any |
 | GET  | `/api/users` | JWT | Manager+ |
 | POST | `/api/users` | JWT | Manager, Administrator |
+| POST | `/api/users/:id/send-setup-link` | JWT | Manager, Administrator |
 | DELETE | `/api/users/:id` | JWT | Admin, Administrator |
 | PATCH | `/api/users/:id/role` | JWT | Administrator |
 | GET  | `/api/users/logs/audit` | JWT | Administrator |

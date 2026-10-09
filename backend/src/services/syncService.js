@@ -14,6 +14,7 @@ const TABLES = {
   users: [
     'id', 'username', 'email', 'password_hash', 'salt', 'mfa_secret',
     'mfa_enabled', 'email_otp_hash', 'email_otp_expires_at', 'role',
+    'password_setup_token_hash', 'password_setup_expires_at',
     'is_active', 'last_login_at', 'created_at', 'updated_at',
   ],
   audit_logs: [
@@ -22,7 +23,7 @@ const TABLES = {
 };
 
 let remotePool;
-let syncInProgress = false;
+let syncPromise;
 
 function getRemotePool() {
   if (!process.env.SUPABASE_DATABASE_URL) {
@@ -360,9 +361,8 @@ async function processIncomingEvents(target, sourceSide, events, targetAckCursor
 }
 
 async function syncOnce() {
-  if (syncInProgress) return;
-  syncInProgress = true;
-  try {
+  if (syncPromise) return syncPromise;
+  const currentSync = Promise.resolve().then(async () => {
     const remote = getRemotePool();
     const localState = await getNodeState(localPool);
     const remoteState = await getNodeState(remote);
@@ -403,9 +403,31 @@ async function syncOnce() {
         `local → Supabase: ${pushed.applied} applied, ${pushed.conflicts} conflicts`
       );
     }
+  })();
+  syncPromise = currentSync;
+  try {
+    return await currentSync;
   } finally {
-    syncInProgress = false;
+    if (syncPromise === currentSync) syncPromise = null;
   }
+}
+
+async function syncSetupToken(userId, tokenHash) {
+  if (process.env.VERCEL === '1') return;
+  const remote = getRemotePool();
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    await syncOnce();
+    const { rows } = await remote.query(
+      `SELECT 1 FROM users
+       WHERE id = $1 AND password_setup_token_hash = $2
+         AND password_setup_expires_at > NOW()`,
+      [userId, tokenHash]
+    );
+    if (rows.length) return;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('Password setup invitation did not reach Supabase before timeout');
 }
 
 function startSyncCron() {
@@ -564,6 +586,7 @@ module.exports = {
   resolveConflict,
   startSyncCron,
   syncOnce,
+  syncSetupToken,
 };
 
 if (require.main === module) {

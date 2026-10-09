@@ -25,6 +25,8 @@ CREATE TABLE users (
     mfa_enabled   BOOLEAN       NOT NULL DEFAULT FALSE,
     email_otp_hash TEXT,                         -- SHA-256 hash of temporary email OTP
     email_otp_expires_at TIMESTAMPTZ,            -- Expiry timestamp for email OTP (10 min TTL)
+    password_setup_token_hash TEXT,
+    password_setup_expires_at TIMESTAMPTZ,
     role          user_role     NOT NULL DEFAULT 'inputer',
     is_active     BOOLEAN       NOT NULL DEFAULT TRUE,
     last_login_at TIMESTAMPTZ,

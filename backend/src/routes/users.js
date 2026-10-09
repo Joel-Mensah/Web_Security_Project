@@ -4,10 +4,13 @@
 
 const express  = require('express');
 const { body, param, validationResult } = require('express-validator');
+const crypto = require('crypto');
 
 const { query }             = require('../config/db');
 const { generateSalt, hashPassword } = require('../services/cryptoService');
 const { log, AuditAction }  = require('../services/auditService');
+const { sendAccountSetupLink } = require('../services/emailService');
+const { ensureCloudOnline, syncSetupToken } = require('../services/syncService');
 const authenticate          = require('../middleware/authenticate');
 const authorizeRole         = require('../middleware/authorizeRole');
 
@@ -79,14 +82,15 @@ router.post(
   [
     body('username').trim().isLength({ min: 3, max: 64 }).matches(/^[a-zA-Z0-9_]+$/),
     body('email').isEmail().normalizeEmail(),
-    body('password').isLength({ min: 10 }).withMessage('Password must be at least 10 characters'),
+    body('password').optional().isLength({ min: 10 }).withMessage('Password must be at least 10 characters'),
     body('role').optional().isIn(VALID_ROLES),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { username, email, password } = req.body;
+    const { username, email } = req.body;
+    const password = req.body.password || crypto.randomBytes(32).toString('base64url');
     let   { role = 'inputer' } = req.body;
 
     // Managers can only create inputer accounts
@@ -121,6 +125,63 @@ router.post(
       }
       console.error('[USERS] POST / error:', err.message);
       res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+router.post(
+  '/:id/send-setup-link',
+  authorizeRole(['manager', 'administrator']),
+  [param('id').isUUID()],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    try {
+      await ensureCloudOnline();
+      const { rows } = await query(
+        'SELECT id, username, email, role, is_active FROM users WHERE id = $1',
+        [req.params.id]
+      );
+      const user = rows[0];
+      if (!user || !user.is_active) {
+        return res.status(404).json({ message: 'Active user not found' });
+      }
+      if (req.user.role === 'manager' && user.role !== 'inputer') {
+        return res.status(403).json({ message: 'Managers may only send setup links to Inputer accounts' });
+      }
+
+      const token = crypto.randomBytes(32).toString('hex');
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      await query(
+        `UPDATE users
+         SET password_setup_token_hash = $1,
+             password_setup_expires_at = NOW() + INTERVAL '30 minutes'
+         WHERE id = $2`,
+        [tokenHash, user.id]
+      );
+
+      await syncSetupToken(user.id, tokenHash);
+
+      const setupBase = process.env.ACCOUNT_SETUP_URL || process.env.FRONTEND_URL;
+      if (!setupBase) {
+        throw new Error('ACCOUNT_SETUP_URL or FRONTEND_URL must be configured');
+      }
+      const setupUrl = new URL('/setup-password', setupBase);
+      setupUrl.searchParams.set('token', token);
+      await sendAccountSetupLink(user.email, user.username, setupUrl.toString());
+
+      await log({
+        userId: user.id,
+        actorId: req.user.id,
+        action: 'USER_SETUP_LINK_SENT',
+        ipAddress: getIp(req),
+        details: { username: user.username, role: user.role },
+      });
+      res.json({ message: `Password setup email sent to ${user.email}` });
+    } catch (err) {
+      console.error('[USERS] Send setup link error:', err.message);
+      res.status(500).json({ message: 'Could not send the password setup email. Please try again.' });
     }
   }
 );

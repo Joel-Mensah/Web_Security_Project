@@ -60,9 +60,42 @@ async function sendOTP(toEmail, otp) {
   return transporter.sendMail(mailOptions);
 }
 
+async function sendAccountSetupLink(toEmail, username, setupUrl) {
+  const { user } = getGmailCredentials();
+  const safeUsername = String(username).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character]);
+  const safeSetupUrl = String(setupUrl).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+
+  return transporter.sendMail({
+    from: `"Enterprise Security Portal" <${user}>`,
+    to: toEmail,
+    subject: 'Set up your EnterpriseAuth account',
+    text:
+      `Hello ${username},\n\n` +
+      `Your EnterpriseAuth account has been created. Your username is: ${username}\n\n` +
+      `Set your password using this secure, single-use link (expires in 30 minutes):\n${setupUrl}\n\n` +
+      'You will set up two-factor authentication the first time you sign in.',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px;">
+        <h2>Welcome to EnterpriseAuth</h2>
+        <p>Hello ${safeUsername}, your account has been created.</p>
+        <p>Your username is <strong>${safeUsername}</strong>.</p>
+        <p><a href="${safeSetupUrl}">Set your password</a></p>
+        <p>This single-use link expires in 30 minutes. You will set up two-factor authentication when you first sign in.</p>
+        <p>If you were not expecting this email, contact your administrator.</p>
+      </div>
+    `,
+  });
+}
+
 async function verifyEmailService() {
   getGmailCredentials();
   await transporter.verify();
 }
 
-module.exports = { sendOTP, verifyEmailService };
+module.exports = { sendOTP, sendAccountSetupLink, verifyEmailService };

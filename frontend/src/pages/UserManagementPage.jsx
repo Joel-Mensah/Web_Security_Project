@@ -1,14 +1,16 @@
 // src/pages/UserManagementPage.jsx
 import { useState, useEffect, useCallback } from 'react';
-import { UserPlus, Search, RefreshCw, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { UserPlus, Search, RefreshCw, ChevronLeft, ChevronRight, Loader2, Mail, CheckCircle } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import client from '../api/client';
 import UserTable from '../components/UserTable';
 
 function AddUserModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ username: '', email: '', password: '', role: 'inputer' });
+  const [form, setForm] = useState({ username: '', email: '', role: 'inputer' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [createdUser, setCreatedUser] = useState(null);
+  const [emailSent, setEmailSent] = useState(false);
   const { hasRole } = useAuth();
 
   const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -19,9 +21,19 @@ function AddUserModal({ onClose, onCreated }) {
     try {
       const { data } = await client.post('/users', form);
       onCreated(data);
-      onClose();
+      setCreatedUser(data);
     } catch (err) {
       setError(err?.response?.data?.message || 'Failed to create user');
+    } finally { setLoading(false); }
+  };
+
+  const handleSendSetupLink = async () => {
+    setLoading(true); setError('');
+    try {
+      await client.post(`/users/${createdUser.id}/send-setup-link`);
+      setEmailSent(true);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Could not send the password setup email');
     } finally { setLoading(false); }
   };
 
@@ -29,13 +41,42 @@ function AddUserModal({ onClose, onCreated }) {
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="glass-card p-7 w-full max-w-md animate-slide-up">
         <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
-          <UserPlus className="w-5 h-5 text-emerald-400" /> Add New User
+          {createdUser ? <Mail className="w-5 h-5 text-emerald-400" /> : <UserPlus className="w-5 h-5 text-emerald-400" />}
+          {createdUser ? 'Send Login Setup Email' : 'Add New User'}
         </h3>
         {error && <p className="text-red-300 text-sm bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-xl mb-4">{error}</p>}
+        {createdUser ? (
+          <div className="space-y-4">
+            <p className="text-sm text-slate-300">
+              Account <strong className="text-white">{createdUser.username}</strong> was created for{' '}
+              <strong className="text-white">{createdUser.email}</strong>.
+            </p>
+            <p className="text-sm text-slate-400">
+              Send a single-use password setup link. It expires in 30 minutes; the user chooses their own password.
+            </p>
+            {emailSent && (
+              <p role="status" className="flex items-center gap-2 text-sm text-emerald-300">
+                <CheckCircle className="h-4 w-4" /> Setup email sent.
+              </p>
+            )}
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={onClose} className="btn-ghost flex-1 border border-white/10">Close</button>
+              <button
+                type="button"
+                onClick={handleSendSetupLink}
+                disabled={loading}
+                className="btn-primary flex-1 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {loading
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</>
+                  : <><Mail className="h-4 w-4" /> {emailSent ? 'Resend Link' : 'Send Setup Link'}</>}
+              </button>
+            </div>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
           <input name="username" placeholder="Username" value={form.username} onChange={handleChange} className="form-input" required minLength={3} />
           <input name="email"    placeholder="Email"    type="email" value={form.email} onChange={handleChange} className="form-input" required />
-          <input name="password" placeholder="Password (min 10 chars)" type="password" value={form.password} onChange={handleChange} className="form-input" required minLength={10} />
           {hasRole('administrator') && (
             <select name="role" value={form.role} onChange={handleChange} className="form-input">
               <option value="inputer">Inputer</option>
@@ -51,6 +92,7 @@ function AddUserModal({ onClose, onCreated }) {
             </button>
           </div>
         </form>
+        )}
       </div>
     </div>
   );

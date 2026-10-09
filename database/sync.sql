@@ -17,6 +17,10 @@ INSERT INTO sync_node (singleton)
 VALUES (TRUE)
 ON CONFLICT (singleton) DO NOTHING;
 
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS password_setup_token_hash TEXT,
+    ADD COLUMN IF NOT EXISTS password_setup_expires_at TIMESTAMPTZ;
+
 CREATE TABLE IF NOT EXISTS sync_outbox (
     id              BIGSERIAL PRIMARY KEY,
     origin_node_id  UUID NOT NULL,

@@ -7,6 +7,7 @@ import LoginPage       from './pages/LoginPage';
 import DashboardPage   from './pages/DashboardPage';
 import UserManagementPage from './pages/UserManagementPage';
 import SyncConflictsPage from './pages/SyncConflictsPage';
+import SetupPasswordPage from './pages/SetupPasswordPage';
 
 const localSyncEnabled = import.meta.env.VITE_LOCAL_SYNC_ENABLED !== 'false';
 
@@ -28,6 +29,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/setup-password" element={<SetupPasswordPage />} />
 
           {/* Protected layout */}
           <Route

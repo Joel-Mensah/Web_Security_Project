@@ -4,10 +4,11 @@
 
 const express         = require('express');
 const jwt             = require('jsonwebtoken');
+const crypto          = require('crypto');
 const { body, validationResult } = require('express-validator');
 
 const { query }          = require('../config/db');
-const { verifyPassword } = require('../services/cryptoService');
+const { verifyPassword, generateSalt, hashPassword } = require('../services/cryptoService');
 const { generateSecret, generateQR, verifyToken } = require('../services/totpService');
 const { generateOTP, hashOTP, verifyOTP } = require('../services/otpService');
 const { sendOTP }        = require('../services/emailService');
@@ -16,6 +17,65 @@ const authenticate       = require('../middleware/authenticate');
 const { requireCloudForAuth } = require('../services/syncService');
 
 const router = express.Router();
+
+router.post(
+  '/setup-password',
+  requireCloudForAuth,
+  [
+    body('token').isHexadecimal().isLength({ min: 64, max: 64 }),
+    body('password').isLength({ min: 10 }).withMessage('Password must be at least 10 characters'),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    try {
+      const tokenHash = crypto.createHash('sha256').update(req.body.token).digest('hex');
+      const { rows } = await query(
+        `SELECT id FROM users
+         WHERE password_setup_token_hash = $1
+           AND password_setup_expires_at > NOW()
+           AND is_active = TRUE`,
+        [tokenHash]
+      );
+      if (!rows[0]) {
+        return res.status(400).json({ message: 'This password setup link is invalid or expired.' });
+      }
+
+      const salt = generateSalt();
+      const passwordHash = await hashPassword(req.body.password, salt);
+      const updated = await query(
+        `UPDATE users
+         SET password_hash = $1,
+             salt = $2,
+             mfa_secret = NULL,
+             mfa_enabled = FALSE,
+             password_setup_token_hash = NULL,
+             password_setup_expires_at = NULL
+         WHERE id = $3
+           AND password_setup_token_hash = $4
+           AND password_setup_expires_at > NOW()
+           AND is_active = TRUE
+         RETURNING id`,
+        [passwordHash, salt, rows[0].id, tokenHash]
+      );
+      if (!updated.rows[0]) {
+        return res.status(400).json({ message: 'This password setup link is invalid or expired.' });
+      }
+
+      await log({
+        userId: rows[0].id,
+        actorId: rows[0].id,
+        action: 'USER_PASSWORD_SETUP_COMPLETED',
+        ipAddress: getIp(req),
+      });
+      res.json({ message: 'Password set successfully. You can now sign in and set up two-factor authentication.' });
+    } catch (err) {
+      console.error('[AUTH] /setup-password error:', err.message);
+      res.status(500).json({ message: 'Could not set the password. Please try again.' });
+    }
+  }
+);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
