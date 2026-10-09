@@ -428,6 +428,10 @@ function startSyncCron() {
 }
 
 async function ensureCloudOnline() {
+  if (process.env.VERCEL === '1') {
+    await localPool.query('SELECT 1');
+    return;
+  }
   await getRemotePool().query('SELECT 1');
 }
 

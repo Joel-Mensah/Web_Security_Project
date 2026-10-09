@@ -18,6 +18,12 @@ const { startSyncCron } = require('./src/services/syncService');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
+const frontendSetting = process.env.FRONTEND_URL || 'http://localhost:5173';
+const frontendOrigin = new URL(
+  /^[a-z][a-z\d+.-]*:\/\//i.test(frontendSetting)
+    ? frontendSetting
+    : `https://${frontendSetting}`
+).origin;
 
 // ─── Security headers ─────────────────────────────────────────────────────────
 app.use(helmet());
@@ -25,7 +31,7 @@ app.set('trust proxy', 1);  // Required for rate-limiter behind nginx/reverse pr
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin:      process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin:      frontendOrigin,
   credentials: true,
   methods:     ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
