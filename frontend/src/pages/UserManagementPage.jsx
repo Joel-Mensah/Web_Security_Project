@@ -122,6 +122,7 @@ export default function UserManagementPage() {
   const [page, setPage]       = useState(1);
   const [total, setTotal]     = useState(0);
   const [showAdd, setShowAdd] = useState(false);
+  const [setupLinkState, setSetupLinkState] = useState({});
   const PAGE_SIZE = 20;
 
   const canAdd    = hasRole('manager', 'administrator');
@@ -155,6 +156,19 @@ export default function UserManagementPage() {
       setUsers(prev => prev.map(u => u.id === id ? { ...u, role: data.role } : u));
     } catch (err) {
       alert(err?.response?.data?.message || 'Role change failed');
+    }
+  };
+
+  const handleResendSetupLink = async (id) => {
+    setSetupLinkState(prev => ({ ...prev, [id]: { loading: true } }));
+    try {
+      await client.post(`/users/${id}/send-setup-link`);
+      setSetupLinkState(prev => ({ ...prev, [id]: { message: 'Email sent' } }));
+    } catch (err) {
+      setSetupLinkState(prev => ({
+        ...prev,
+        [id]: { error: getRequestErrorMessage(err, 'Could not send setup email') },
+      }));
     }
   };
 
@@ -210,6 +224,8 @@ export default function UserManagementPage() {
         loading={loading}
         onDelete={handleDelete}
         onRoleChange={handleRoleChange}
+        onResendSetupLink={handleResendSetupLink}
+        setupLinkState={setupLinkState}
         currentUserId={currentUser?.id}
       />
 

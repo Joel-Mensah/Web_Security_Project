@@ -19,7 +19,14 @@ ON CONFLICT (singleton) DO NOTHING;
 
 ALTER TABLE users
     ADD COLUMN IF NOT EXISTS password_setup_token_hash TEXT,
-    ADD COLUMN IF NOT EXISTS password_setup_expires_at TIMESTAMPTZ;
+    ADD COLUMN IF NOT EXISTS password_setup_expires_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS credential_setup_required BOOLEAN NOT NULL DEFAULT FALSE;
+
+UPDATE users
+SET credential_setup_required = TRUE
+WHERE credential_setup_required = FALSE
+  AND password_setup_token_hash IS NOT NULL
+  AND last_login_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS sync_outbox (
     id              BIGSERIAL PRIMARY KEY,

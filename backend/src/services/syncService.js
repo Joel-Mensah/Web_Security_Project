@@ -14,7 +14,7 @@ const TABLES = {
   users: [
     'id', 'username', 'email', 'password_hash', 'salt', 'mfa_secret',
     'mfa_enabled', 'email_otp_hash', 'email_otp_expires_at', 'role',
-    'password_setup_token_hash', 'password_setup_expires_at',
+    'password_setup_token_hash', 'password_setup_expires_at', 'credential_setup_required',
     'is_active', 'last_login_at', 'created_at', 'updated_at',
   ],
   audit_logs: [

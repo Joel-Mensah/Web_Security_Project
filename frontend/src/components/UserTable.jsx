@@ -1,6 +1,6 @@
 // src/components/UserTable.jsx
 import { useAuth } from '../hooks/useAuth';
-import { Trash2, UserPlus, MoreVertical, CheckCircle, XCircle } from 'lucide-react';
+import { Trash2, CheckCircle, XCircle, Mail, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
 const ROLE_BADGE_CLASSES = {
@@ -34,7 +34,15 @@ function ConfirmModal({ username, onConfirm, onCancel }) {
   );
 }
 
-export default function UserTable({ users = [], loading, onDelete, onRoleChange, currentUserId }) {
+export default function UserTable({
+  users = [],
+  loading,
+  onDelete,
+  onRoleChange,
+  onResendSetupLink,
+  setupLinkState = {},
+  currentUserId,
+}) {
   const { hasRole }              = useAuth();
   const [confirmUser, setConfirm] = useState(null);
 
@@ -138,15 +146,40 @@ export default function UserTable({ users = [], loading, onDelete, onRoleChange,
 
                 {/* Actions */}
                 <td className="px-4 py-3">
-                  {canDelete && u.id !== currentUserId && (
-                    <button
-                      onClick={() => setConfirm(u)}
-                      className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1.5 rounded-lg hover:bg-red-500/10"
-                      title="Delete user"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    {hasRole('manager', 'administrator') && u.setup_pending && (
+                      <div className="flex items-center gap-2">
+                        {setupLinkState[u.id]?.message && (
+                          <span role="status" className="text-xs text-emerald-300">{setupLinkState[u.id].message}</span>
+                        )}
+                        {setupLinkState[u.id]?.error && (
+                          <span role="alert" className="text-xs text-red-300">{setupLinkState[u.id].error}</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => onResendSetupLink(u.id)}
+                          disabled={setupLinkState[u.id]?.loading}
+                          className="inline-flex items-center gap-1.5 text-xs text-slate-300 hover:text-emerald-300 disabled:opacity-50 px-2 py-1.5 rounded-lg hover:bg-emerald-500/10"
+                          title="Resend password setup link"
+                          aria-label={`Resend password setup link to ${u.username}`}
+                        >
+                          {setupLinkState[u.id]?.loading
+                            ? <Loader2 className="w-4 h-4 animate-spin" />
+                            : <Mail className="w-4 h-4" />}
+                          Resend
+                        </button>
+                      </div>
+                    )}
+                    {canDelete && u.id !== currentUserId && (
+                      <button
+                        onClick={() => setConfirm(u)}
+                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1.5 rounded-lg hover:bg-red-500/10"
+                        title="Delete user"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

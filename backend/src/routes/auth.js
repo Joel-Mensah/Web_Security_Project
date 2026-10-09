@@ -35,6 +35,7 @@ router.post(
         `SELECT id FROM users
          WHERE password_setup_token_hash = $1
            AND password_setup_expires_at > NOW()
+           AND credential_setup_required = TRUE
            AND is_active = TRUE`,
         [tokenHash]
       );
@@ -51,10 +52,12 @@ router.post(
              mfa_secret = NULL,
              mfa_enabled = FALSE,
              password_setup_token_hash = NULL,
-             password_setup_expires_at = NULL
+             password_setup_expires_at = NULL,
+             credential_setup_required = FALSE
          WHERE id = $3
            AND password_setup_token_hash = $4
            AND password_setup_expires_at > NOW()
+           AND credential_setup_required = TRUE
            AND is_active = TRUE
          RETURNING id`,
         [passwordHash, salt, rows[0].id, tokenHash]

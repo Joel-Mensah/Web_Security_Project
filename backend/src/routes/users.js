@@ -37,7 +37,8 @@ router.get(
       const offset   = (page - 1) * pageSize;
 
       const { rows }       = await query(
-        `SELECT id, username, email, role, mfa_enabled, is_active, last_login_at, created_at
+        `SELECT id, username, email, role, mfa_enabled, is_active, last_login_at, created_at,
+                (credential_setup_required AND is_active) AS setup_pending
          FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
         [pageSize, offset]
       );
@@ -103,9 +104,9 @@ router.post(
       const hash = await hashPassword(password, salt);
 
       const { rows } = await query(
-        `INSERT INTO users (username, email, password_hash, salt, role)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, username, email, role, created_at`,
+        `INSERT INTO users (username, email, password_hash, salt, role, credential_setup_required)
+         VALUES ($1, $2, $3, $4, $5, TRUE)
+         RETURNING id, username, email, role, created_at, credential_setup_required AS setup_pending`,
         [username.toLowerCase(), email, hash, salt, role]
       );
       const newUser = rows[0];
@@ -140,12 +141,15 @@ router.post(
     try {
       await ensureCloudOnline();
       const { rows } = await query(
-        'SELECT id, username, email, role, is_active FROM users WHERE id = $1',
+        'SELECT id, username, email, role, is_active, credential_setup_required FROM users WHERE id = $1',
         [req.params.id]
       );
       const user = rows[0];
       if (!user || !user.is_active) {
         return res.status(404).json({ message: 'Active user not found' });
+      }
+      if (!user.credential_setup_required) {
+        return res.status(409).json({ message: 'This user has already set a password; no setup link is needed.' });
       }
       if (req.user.role === 'manager' && user.role !== 'inputer') {
         return res.status(403).json({ message: 'Managers may only send setup links to Inputer accounts' });
