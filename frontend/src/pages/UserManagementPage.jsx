@@ -5,6 +5,22 @@ import { useAuth } from '../hooks/useAuth';
 import client from '../api/client';
 import UserTable from '../components/UserTable';
 
+function getRequestErrorMessage(err, fallback) {
+  const response = err?.response;
+  const data = response?.data;
+  if (data?.message) return data.message;
+
+  const validationErrors = data?.errors;
+  if (Array.isArray(validationErrors) && validationErrors.length) {
+    return validationErrors
+      .map(({ path, param, msg }) => `${path || param || 'Input'}: ${msg}`)
+      .join('; ');
+  }
+
+  if (response) return `${fallback} (HTTP ${response.status})`;
+  return `${fallback}. Check your connection and try again.`;
+}
+
 function AddUserModal({ onClose, onCreated }) {
   const [form, setForm] = useState({ username: '', email: '', role: 'inputer' });
   const [error, setError] = useState('');
@@ -23,7 +39,7 @@ function AddUserModal({ onClose, onCreated }) {
       onCreated(data);
       setCreatedUser(data);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to create user');
+      setError(getRequestErrorMessage(err, 'Failed to create user'));
     } finally { setLoading(false); }
   };
 
@@ -33,7 +49,7 @@ function AddUserModal({ onClose, onCreated }) {
       await client.post(`/users/${createdUser.id}/send-setup-link`);
       setEmailSent(true);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Could not send the password setup email');
+      setError(getRequestErrorMessage(err, 'Could not send the password setup email'));
     } finally { setLoading(false); }
   };
 
