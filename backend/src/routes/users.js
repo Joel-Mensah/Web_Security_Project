@@ -41,6 +41,10 @@ function getSetupLinkErrorMessage(err, stage) {
     return 'The setup email was sent, but the action could not be recorded. Check backend logs before retrying.';
   }
 
+  if (stage === 'validating setup URL') {
+    return 'The setup page URL is missing or invalid. In the Vercel backend project, set ACCOUNT_SETUP_URL to https://web-security-project-tan.vercel.app for Production, then redeploy the backend.';
+  }
+
   console.error(`[USERS] Setup-link request failed during ${stage} (${err.code || 'NO_CODE'}):`, err.message);
   return `The setup-link request failed during ${stage}. Check the backend function logs and try again.`;
 }
@@ -197,10 +201,10 @@ router.post(
 
       stage = 'validating setup URL';
       const setupBase = process.env.ACCOUNT_SETUP_URL || process.env.FRONTEND_URL;
-      if (!setupBase) {
-        throw new Error('ACCOUNT_SETUP_URL or FRONTEND_URL must be configured');
-      }
       const setupUrl = new URL('/setup-password', setupBase);
+      if (!['http:', 'https:'].includes(setupUrl.protocol)) {
+        throw new Error('Setup URL must use HTTP or HTTPS');
+      }
       setupUrl.searchParams.set('token', token);
       stage = 'Gmail delivery';
       await sendAccountSetupLink(user.email, user.username, setupUrl.toString());
