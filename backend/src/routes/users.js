@@ -21,6 +21,30 @@ router.use(authenticate);
 
 const VALID_ROLES = ['inputer', 'manager', 'admin', 'administrator'];
 
+function getSetupLinkErrorMessage(err, stage) {
+  const errorMessage = typeof err?.message === 'string' ? err.message : '';
+  if (stage === 'Gmail delivery') {
+    if (
+      errorMessage.includes('Set a valid GMAIL_USER') ||
+      err.code === 'EAUTH' ||
+      err.responseCode === 535
+    ) {
+      return 'The Vercel Gmail settings are missing or rejected. Check GMAIL_USER and GMAIL_APP_PASSWORD in the backend project’s Production environment variables, then redeploy the backend.';
+    }
+    if (['ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ENOTFOUND'].includes(err.code)) {
+      return 'The Vercel backend could not connect to Gmail. Check the backend function logs and try again.';
+    }
+    return `Gmail could not send the setup email${err.code ? ` (${err.code})` : ''}. Check the backend function logs for details.`;
+  }
+
+  if (stage === 'audit logging') {
+    return 'The setup email was sent, but the action could not be recorded. Check backend logs before retrying.';
+  }
+
+  console.error(`[USERS] Setup-link request failed during ${stage} (${err.code || 'NO_CODE'}):`, err.message);
+  return `The setup-link request failed during ${stage}. Check the backend function logs and try again.`;
+}
+
 function getIp(req) {
   return req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.ip;
 }
@@ -138,8 +162,10 @@ router.post(
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
+    let stage = 'cloud connection';
     try {
       await ensureCloudOnline();
+      stage = 'loading user account';
       const { rows } = await query(
         'SELECT id, username, email, role, is_active, credential_setup_required FROM users WHERE id = $1',
         [req.params.id]
@@ -157,6 +183,7 @@ router.post(
 
       const token = crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      stage = 'saving setup link';
       await query(
         `UPDATE users
          SET password_setup_token_hash = $1,
@@ -165,16 +192,20 @@ router.post(
         [tokenHash, user.id]
       );
 
+      stage = 'synchronizing setup link';
       await syncSetupToken(user.id, tokenHash);
 
+      stage = 'validating setup URL';
       const setupBase = process.env.ACCOUNT_SETUP_URL || process.env.FRONTEND_URL;
       if (!setupBase) {
         throw new Error('ACCOUNT_SETUP_URL or FRONTEND_URL must be configured');
       }
       const setupUrl = new URL('/setup-password', setupBase);
       setupUrl.searchParams.set('token', token);
+      stage = 'Gmail delivery';
       await sendAccountSetupLink(user.email, user.username, setupUrl.toString());
 
+      stage = 'audit logging';
       await log({
         userId: user.id,
         actorId: req.user.id,
@@ -184,8 +215,8 @@ router.post(
       });
       res.json({ message: `Password setup email sent to ${user.email}` });
     } catch (err) {
-      console.error('[USERS] Send setup link error:', err.message);
-      res.status(500).json({ message: 'Could not send the password setup email. Please try again.' });
+      console.error(`[USERS] Send setup link failed during ${stage} (${err.code || 'NO_CODE'}):`, err.message);
+      res.status(500).json({ message: getSetupLinkErrorMessage(err, stage) });
     }
   }
 );
