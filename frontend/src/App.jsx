@@ -7,6 +7,7 @@ import LoginPage       from './pages/LoginPage';
 import DashboardPage   from './pages/DashboardPage';
 import UserManagementPage from './pages/UserManagementPage';
 import SyncConflictsPage from './pages/SyncConflictsPage';
+import AuditLogsPage from './pages/AuditLogsPage';
 import SetupPasswordPage from './pages/SetupPasswordPage';
 
 const localSyncEnabled = import.meta.env.VITE_LOCAL_SYNC_ENABLED !== 'false';
@@ -41,6 +42,14 @@ export default function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardPage />} />
+            <Route
+              path="/audit"
+              element={
+                <ProtectedRoute roles={['administrator']}>
+                  <AuditLogsPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/users"
               element={

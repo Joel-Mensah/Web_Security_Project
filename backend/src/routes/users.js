@@ -80,6 +80,26 @@ router.get(
   }
 );
 
+router.get(
+  '/dashboard-summary',
+  authorizeRole(['manager', 'admin', 'administrator']),
+  async (_req, res) => {
+    try {
+      const { rows } = await query(
+        `SELECT COUNT(*)::int AS total_users,
+                COUNT(*) FILTER (WHERE is_active)::int AS active_users,
+                COUNT(*) FILTER (WHERE mfa_enabled AND is_active)::int AS mfa_enabled_users,
+                COUNT(*) FILTER (WHERE credential_setup_required AND is_active)::int AS setup_pending
+         FROM users`
+      );
+      res.json(rows[0]);
+    } catch (err) {
+      console.error('[USERS] GET /dashboard-summary error:', err.message);
+      res.status(500).json({ message: 'Could not load dashboard summary' });
+    }
+  }
+);
+
 // ─── GET /api/users/:id ───────────────────────────────────────────────────────
 router.get(
   '/:id',
@@ -226,7 +246,7 @@ router.post(
 );
 
 // ─── DELETE /api/users/:id ────────────────────────────────────────────────────
-// Only Admin and Administrator can delete Inputers
+// Admins can delete Inputers and Administrators. Administrators can delete any account.
 router.delete(
   '/:id',
   authorizeRole(['admin', 'administrator']),
