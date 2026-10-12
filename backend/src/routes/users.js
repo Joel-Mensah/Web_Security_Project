@@ -211,7 +211,7 @@ router.post(
       await query(
         `UPDATE users
          SET password_setup_token_hash = $1,
-             password_setup_expires_at = NOW() + INTERVAL '30 minutes'
+             password_setup_expires_at = NOW() + INTERVAL '1 hour'
          WHERE id = $2`,
         [tokenHash, user.id]
       );
@@ -228,6 +228,24 @@ router.post(
       setupUrl.searchParams.set('token', token);
       stage = 'Gmail delivery';
       await sendAccountSetupLink(user.email, user.username, setupUrl.toString());
+
+      stage = 'finalizing setup link expiry';
+      const { rows: finalizedToken } = await query(
+        `UPDATE users
+         SET password_setup_expires_at = NOW() + INTERVAL '30 minutes'
+         WHERE id = $1
+           AND password_setup_token_hash = $2
+           AND credential_setup_required = TRUE
+           AND is_active = TRUE
+         RETURNING id`,
+        [user.id, tokenHash]
+      );
+      if (!finalizedToken[0]) {
+        throw new Error('Password setup link was replaced before delivery completed');
+      }
+
+      stage = 'synchronizing final setup expiry';
+      await syncSetupToken(user.id, tokenHash);
 
       stage = 'audit logging';
       await log({
@@ -267,9 +285,13 @@ router.delete(
       const target = rows[0];
       if (!target) return res.status(404).json({ message: 'User not found' });
 
-      // Admins (non-administrator) can only delete inputer accounts
-      if (req.user.role === 'admin' && target.role !== 'inputer') {
-        return res.status(403).json({ message: 'Admins may only delete Inputer accounts' });
+      if (
+        req.user.role === 'admin' &&
+        !['inputer', 'administrator'].includes(target.role)
+      ) {
+        return res.status(403).json({
+          message: 'Admins may only delete Inputer or Administrator accounts',
+        });
       }
 
       await query('DELETE FROM users WHERE id = $1', [req.params.id]);

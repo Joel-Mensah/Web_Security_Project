@@ -53,7 +53,7 @@ export default function SyncConflictsPage() {
   };
 
   return (
-    <div className="flex-1 space-y-6 overflow-y-auto p-8 animate-fade-in">
+    <div className="flex-1 space-y-6 overflow-y-auto p-4 animate-fade-in sm:p-6 lg:p-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-white">

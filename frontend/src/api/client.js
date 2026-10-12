@@ -10,7 +10,9 @@ const client = axios.create({
 // Inject JWT from localStorage on every request
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('accessToken');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (token && !config.headers.get('Authorization')) {
+    config.headers.set('Authorization', `Bearer ${token}`);
+  }
   return config;
 });
 

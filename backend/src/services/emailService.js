@@ -60,6 +60,28 @@ async function sendOTP(toEmail, otp) {
   return transporter.sendMail(mailOptions);
 }
 
+async function sendPasswordResetOTP(toEmail, otp) {
+  const { user } = getGmailCredentials();
+
+  return transporter.sendMail({
+    from: `"Enterprise Security Portal" <${user}>`,
+    to: toEmail,
+    subject: 'Your EnterpriseAuth password reset code',
+    text:
+      `Your password reset code is: ${otp}\n\n` +
+      'This single-use code expires in 10 minutes. If you did not request a password reset, you can ignore this email.',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px;">
+        <h2>EnterpriseAuth password reset</h2>
+        <p>Use this code to choose a new password:</p>
+        <p style="font-size: 32px; letter-spacing: 6px; font-weight: bold; font-family: monospace;">${otp}</p>
+        <p>This single-use code expires in 10 minutes.</p>
+        <p>If you did not request a password reset, you can ignore this email.</p>
+      </div>
+    `,
+  });
+}
+
 async function sendAccountSetupLink(toEmail, username, setupUrl) {
   const { user } = getGmailCredentials();
   const safeUsername = String(username).replace(/[&<>"']/g, (character) => ({
@@ -98,4 +120,4 @@ async function verifyEmailService() {
   await transporter.verify();
 }
 
-module.exports = { sendOTP, sendAccountSetupLink, verifyEmailService };
+module.exports = { sendOTP, sendPasswordResetOTP, sendAccountSetupLink, verifyEmailService };

@@ -3,6 +3,7 @@
 'use strict';
 
 const { log, AuditAction } = require('../services/auditService');
+const { query } = require('../config/db');
 
 /**
  * RBAC middleware factory.
@@ -21,25 +22,40 @@ function authorizeRole(allowedRoles) {
       return res.status(401).json({ message: 'Not authenticated' });
     }
 
-    if (!normalized.includes(req.user.role.toLowerCase())) {
-      await log({
-        userId:    req.user.id,
-        actorId:   req.user.id,
-        action:    AuditAction.UNAUTHORIZED,
-        ipAddress: req.ip,
-        details:   {
-          requiredRoles: normalized,
-          userRole:      req.user.role,
-          path:          req.originalUrl,
-          method:        req.method,
-        },
-      });
-      return res.status(403).json({
-        message: `Access denied. Required role(s): ${allowedRoles.join(', ')}`,
-      });
-    }
+    try {
+      const { rows } = await query(
+        'SELECT role, is_active FROM users WHERE id = $1',
+        [req.user.id]
+      );
+      const account = rows[0];
+      if (!account || !account.is_active) {
+        return res.status(403).json({ message: 'This account is unavailable or inactive' });
+      }
 
-    next();
+      req.user.role = account.role;
+      if (!normalized.includes(account.role.toLowerCase())) {
+        await log({
+          userId:    req.user.id,
+          actorId:   req.user.id,
+          action:    AuditAction.UNAUTHORIZED,
+          ipAddress: req.ip,
+          details:   {
+            requiredRoles: normalized,
+            userRole:      account.role,
+            path:          req.originalUrl,
+            method:        req.method,
+          },
+        });
+        return res.status(403).json({
+          message: `Access denied. Required role(s): ${allowedRoles.join(', ')}`,
+        });
+      }
+
+      next();
+    } catch (err) {
+      console.error('[AUTHZ] Could not verify current account role:', err.message);
+      return res.status(500).json({ message: 'Could not verify account permissions' });
+    }
   };
 }
 

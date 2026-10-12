@@ -92,7 +92,7 @@ export default function EmailOTPModal({
       </div>
 
       {/* OTP digit boxes */}
-      <div className="flex gap-2 justify-center my-4" onPaste={handlePaste}>
+      <div className="flex justify-center gap-1.5 my-4 sm:gap-2" onPaste={handlePaste}>
         {digits.map((d, i) => (
           <input
             key={i}

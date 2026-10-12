@@ -90,18 +90,18 @@ API credentials are needed.
 
 The local database must have the application schema and empty `users` and
 `audit_logs` tables. From the `backend` folder, run this one-time bootstrap
-while connected to the internet:
+while connected to the internet to import existing Supabase data:
 
 ```powershell
 npm run sync:bootstrap
 ```
 
-This installs non-destructive sync triggers on both databases and copies the
-existing Supabase `users` and `audit_logs` rows locally. It refuses to overwrite
-local rows. Thereafter, the backend synchronizes queued changes in both
-directions once a minute by default. Password/2FA setup and login require
-Supabase to be reachable; already-issued access tokens can continue to be used
-against the local app until they expire.
+It refuses to overwrite local rows. Thereafter, each backend startup
+automatically applies the idempotent `database/sync.sql` migration to both
+databases before starting synchronization. The backend synchronizes queued
+changes in both directions once a minute by default. Password/2FA setup and
+login require Supabase to be reachable; already-issued access tokens can
+continue to be used against the local app until they expire.
 
 ### 4. Create the first Administrator, if needed
 
@@ -149,7 +149,15 @@ Frontend starts at `http://localhost:5173`
 4. [BACKUP / FALLBACK]
    POST /api/auth/send-email-otp   → send 6-digit OTP to user's registered Gmail (10m TTL)
    POST /api/auth/verify-email-otp → verify email OTP → full JWT (8h TTL)
+5. [PASSWORD RECOVERY]
+   POST /api/auth/request-password-reset → email a 6-digit reset code (10m TTL)
+   POST /api/auth/reset-password         → verify the code and save a new password
 ```
+
+Password reset codes are single-use and limited to five attempts. Resetting a
+password does not disable two-factor authentication; the user must still
+complete their configured 2FA method at the next sign-in. Use **Forgot
+password?** on the login form to begin recovery.
 
 ### Password Hashing
 
@@ -234,8 +242,10 @@ Conflicts**, or via `GET /api/sync/conflicts` and
 `POST /api/sync/conflicts/:id/resolve` (`resolution` is `local` or `supabase`).
 The selected version is queued to propagate to both databases.
 
-`database/sync.sql` is a non-destructive migration installed by
-`npm run sync:bootstrap`; do not rerun `database/schema.sql` against Supabase.
+`database/sync.sql` is a non-destructive migration applied automatically at
+backend startup; do not rerun `database/schema.sql` against Supabase.
+`npm run sync:bootstrap` is only needed once to copy existing Supabase data to
+an empty local database.
 Synchronization currently covers only `users` and `audit_logs`. New tables
 need matching change capture and conflict handling before they can be used
 offline.

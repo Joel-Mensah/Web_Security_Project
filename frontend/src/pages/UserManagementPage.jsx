@@ -180,7 +180,7 @@ export default function UserManagementPage() {
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
   return (
-    <div className="flex-1 p-8 space-y-6 animate-fade-in overflow-y-auto">
+    <div className="flex-1 space-y-6 overflow-y-auto p-4 animate-fade-in sm:p-6 lg:p-8">
       {showAdd && (
         <AddUserModal
           onClose={() => setShowAdd(false)}
@@ -194,13 +194,13 @@ export default function UserManagementPage() {
           <h1 className="text-2xl font-bold text-white">User Management</h1>
           <p className="text-slate-400 text-sm">{total} total accounts</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={fetchUsers} className="btn-ghost border border-white/10 flex items-center gap-2 text-sm">
+        <div className="flex w-full items-center gap-2 sm:w-auto sm:gap-3">
+          <button onClick={fetchUsers} className="btn-ghost flex flex-1 items-center justify-center gap-2 border border-white/10 text-sm sm:flex-none">
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
           {canAdd && (
-            <button onClick={() => setShowAdd(true)} className="btn-primary flex items-center gap-2 text-sm">
-              <UserPlus className="w-4 h-4" /> Add Inputer
+            <button onClick={() => setShowAdd(true)} className="btn-primary flex flex-1 items-center justify-center gap-2 px-3 text-sm sm:flex-none sm:px-6">
+              <UserPlus className="w-4 h-4 shrink-0" /> Add Inputer
             </button>
           )}
         </div>

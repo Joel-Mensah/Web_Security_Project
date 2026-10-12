@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Lock, User, Loader2 } from 'lucide-react';
 
-export default function LoginForm({ onSuccess, onError }) {
-  const [form, setForm]       = useState({ username: '', password: '' });
+export default function LoginForm({ onSuccess, onError, onForgotPassword, initialUsername = '' }) {
+  const [form, setForm]       = useState({ username: initialUsername, password: '' });
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [shake, setShake]     = useState(false);
@@ -85,6 +85,14 @@ export default function LoginForm({ onSuccess, onError }) {
         ) : (
           'Continue →'
         )}
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onForgotPassword(form.username)}
+        className="w-full text-center text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+      >
+        Forgot password?
       </button>
     </form>
   );

@@ -35,6 +35,13 @@ CREATE TABLE users (
     updated_at    TIMESTAMPTZ   NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE password_reset_codes (
+    user_id    UUID        PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    code_hash  CHAR(64)    NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    attempts   SMALLINT    NOT NULL DEFAULT 0 CHECK (attempts >= 0 AND attempts < 5)
+);
+
 -- Indexes for fast lookups
 CREATE INDEX idx_users_username  ON users (username);
 CREATE INDEX idx_users_email     ON users (email);

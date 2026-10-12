@@ -28,6 +28,24 @@ WHERE credential_setup_required = FALSE
   AND password_setup_token_hash IS NOT NULL
   AND last_login_at IS NULL;
 
+UPDATE users
+SET credential_setup_required = (
+    password_setup_token_hash IS NOT NULL
+    AND last_login_at IS NULL
+)
+WHERE credential_setup_required IS NULL;
+
+ALTER TABLE users
+    ALTER COLUMN credential_setup_required SET DEFAULT FALSE,
+    ALTER COLUMN credential_setup_required SET NOT NULL;
+
+CREATE TABLE IF NOT EXISTS password_reset_codes (
+    user_id    UUID        PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    code_hash  CHAR(64)    NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    attempts   SMALLINT    NOT NULL DEFAULT 0 CHECK (attempts >= 0 AND attempts < 5)
+);
+
 CREATE TABLE IF NOT EXISTS sync_outbox (
     id              BIGSERIAL PRIMARY KEY,
     origin_node_id  UUID NOT NULL,

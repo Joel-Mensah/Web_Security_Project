@@ -7,11 +7,11 @@ const jwt             = require('jsonwebtoken');
 const crypto          = require('crypto');
 const { body, validationResult } = require('express-validator');
 
-const { query }          = require('../config/db');
+const { query, getClient } = require('../config/db');
 const { verifyPassword, generateSalt, hashPassword } = require('../services/cryptoService');
 const { generateSecret, generateQR, verifyToken } = require('../services/totpService');
 const { generateOTP, hashOTP, verifyOTP } = require('../services/otpService');
-const { sendOTP }        = require('../services/emailService');
+const { sendOTP, sendPasswordResetOTP } = require('../services/emailService');
 const { log, AuditAction } = require('../services/auditService');
 const authenticate       = require('../middleware/authenticate');
 const { requireCloudForAuth } = require('../services/syncService');
@@ -149,6 +149,148 @@ router.post(
     } catch (err) {
       console.error('[AUTH] /login error:', err.message);
       res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+const passwordResetRequestedMessage =
+  'If an active account matches that username, a password reset code has been sent to its registered email address.';
+
+router.post(
+  '/request-password-reset',
+  requireCloudForAuth,
+  [body('username').trim().isLength({ min: 1, max: 64 }).withMessage('Enter your username')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    try {
+      const { rows } = await query(
+        'SELECT id, email FROM users WHERE username = $1 AND is_active = TRUE',
+        [req.body.username.trim().toLowerCase()]
+      );
+      const user = rows[0];
+      if (user) {
+        const otp = generateOTP();
+        const otpHash = hashOTP(otp);
+        await query(
+          `INSERT INTO password_reset_codes (user_id, code_hash, expires_at, attempts)
+           VALUES ($1, $2, NOW() + INTERVAL '10 minutes', 0)
+           ON CONFLICT (user_id) DO UPDATE
+           SET code_hash = EXCLUDED.code_hash,
+               expires_at = EXCLUDED.expires_at,
+               attempts = 0`,
+          [user.id, otpHash]
+        );
+
+        try {
+          await sendPasswordResetOTP(user.email, otp);
+        } catch (err) {
+          await query(
+            'DELETE FROM password_reset_codes WHERE user_id = $1 AND code_hash = $2',
+            [user.id, otpHash]
+          );
+          console.error('[AUTH] Could not send password reset code:', err.message);
+          return res.status(503).json({ message: 'Password recovery email is temporarily unavailable. Please try again later.' });
+        }
+
+        await log({
+          userId: user.id,
+          action: AuditAction.PASSWORD_RESET_REQUESTED,
+          ipAddress: getIp(req),
+        });
+      }
+
+      res.json({ message: passwordResetRequestedMessage });
+    } catch (err) {
+      console.error('[AUTH] /request-password-reset error:', err.message);
+      res.status(500).json({ message: 'Could not process the password recovery request.' });
+    }
+  }
+);
+
+router.post(
+  '/reset-password',
+  requireCloudForAuth,
+  [
+    body('username').trim().isLength({ min: 1, max: 64 }).withMessage('Enter your username'),
+    body('token').trim().matches(/^\d{6}$/).withMessage('Enter the 6-digit email code'),
+    body('password').isLength({ min: 10 }).withMessage('Password must be at least 10 characters'),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    let client;
+    let transactionOpen = false;
+    let userId;
+    try {
+      client = await getClient();
+      await client.query('BEGIN');
+      transactionOpen = true;
+
+      const { rows } = await client.query(
+        `SELECT u.id, r.code_hash, r.expires_at, r.attempts
+         FROM users u
+         JOIN password_reset_codes r ON r.user_id = u.id
+         WHERE u.username = $1 AND u.is_active = TRUE
+         FOR UPDATE OF r`,
+        [req.body.username.trim().toLowerCase()]
+      );
+      const reset = rows[0];
+      userId = reset?.id;
+
+      if (!reset || !verifyOTP(req.body.token, reset.code_hash, reset.expires_at)) {
+        if (reset) {
+          if (new Date(reset.expires_at).getTime() <= Date.now() || reset.attempts + 1 >= 5) {
+            await client.query('DELETE FROM password_reset_codes WHERE user_id = $1', [reset.id]);
+          } else {
+            await client.query(
+              'UPDATE password_reset_codes SET attempts = attempts + 1 WHERE user_id = $1',
+              [reset.id]
+            );
+          }
+        }
+        await client.query('COMMIT');
+        transactionOpen = false;
+        if (userId) {
+          await log({
+            userId,
+            action: AuditAction.PASSWORD_RESET_FAILURE,
+            ipAddress: getIp(req),
+          });
+        }
+        return res.status(400).json({ message: 'The username or reset code is invalid or expired.' });
+      }
+
+      const salt = generateSalt();
+      const passwordHash = await hashPassword(req.body.password, salt);
+      await client.query(
+        `UPDATE users
+         SET password_hash = $1,
+             salt = $2,
+             email_otp_hash = NULL,
+             email_otp_expires_at = NULL
+         WHERE id = $3`,
+        [passwordHash, salt, reset.id]
+      );
+      await client.query('DELETE FROM password_reset_codes WHERE user_id = $1', [reset.id]);
+      await client.query('COMMIT');
+      transactionOpen = false;
+
+      await log({
+        userId: reset.id,
+        actorId: reset.id,
+        action: AuditAction.PASSWORD_RESET_SUCCESS,
+        ipAddress: getIp(req),
+      });
+      return res.json({ message: 'Password reset successfully. You can now sign in with your new password.' });
+    } catch (err) {
+      if (transactionOpen) await client.query('ROLLBACK');
+      console.error('[AUTH] /reset-password error:', err.message);
+      return res.status(500).json({ message: 'Could not reset the password. Please try again.' });
+    } finally {
+      client?.release();
     }
   }
 );

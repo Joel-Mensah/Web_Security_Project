@@ -70,12 +70,20 @@ export default function UserTable({
       )}
 
       <div className="overflow-x-auto rounded-xl border border-white/8">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[350px] text-sm">
           <thead>
             <tr className="border-b border-white/8 bg-white/3">
-              {['User', 'Email', 'Role', 'MFA', 'Status', 'Last Login', ''].map(h => (
-                <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
-                  {h}
+              {[
+                { label: 'User' },
+                { label: 'Email', className: 'hidden lg:table-cell' },
+                { label: 'Role' },
+                { label: 'MFA', className: 'hidden sm:table-cell' },
+                { label: 'Status', className: 'hidden sm:table-cell' },
+                { label: 'Last Login', className: 'hidden lg:table-cell' },
+                { label: '' },
+              ].map(({ label, className = '' }) => (
+                <th key={label} className={`whitespace-nowrap px-2 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 sm:px-4 ${className}`}>
+                  {label}
                 </th>
               ))}
             </tr>
@@ -88,7 +96,7 @@ export default function UserTable({
             ) : users.map(u => (
               <tr key={u.id} className="hover:bg-white/3 transition-colors group">
                 {/* Username */}
-                <td className="px-4 py-3">
+                <td className="px-2 py-3 sm:px-4">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 font-semibold text-xs uppercase flex-shrink-0">
                       {u.username[0]}
@@ -101,10 +109,10 @@ export default function UserTable({
                 </td>
 
                 {/* Email */}
-                <td className="px-4 py-3 text-slate-400">{u.email}</td>
+                <td className="hidden px-4 py-3 text-slate-400 lg:table-cell">{u.email}</td>
 
                 {/* Role badge + change */}
-                <td className="px-4 py-3">
+                <td className="px-2 py-3 sm:px-4">
                   {canChangeRole && u.id !== currentUserId ? (
                     <select
                       value={u.role}
@@ -121,7 +129,7 @@ export default function UserTable({
                 </td>
 
                 {/* MFA status */}
-                <td className="px-4 py-3">
+                <td className="hidden px-4 py-3 sm:table-cell">
                   {u.mfa_enabled
                     ? <CheckCircle className="w-4 h-4 text-emerald-400" />
                     : <XCircle    className="w-4 h-4 text-slate-600"    />
@@ -129,7 +137,7 @@ export default function UserTable({
                 </td>
 
                 {/* Active status */}
-                <td className="px-4 py-3">
+                <td className="hidden px-4 py-3 sm:table-cell">
                   <span className={`flex items-center gap-1.5 text-xs font-medium ${u.is_active ? 'text-emerald-400' : 'text-slate-500'}`}>
                     <span className={`status-dot ${u.is_active ? 'bg-emerald-400' : 'bg-slate-600'}`} />
                     {u.is_active ? 'Active' : 'Inactive'}
@@ -137,7 +145,7 @@ export default function UserTable({
                 </td>
 
                 {/* Last login */}
-                <td className="px-4 py-3 text-slate-400 whitespace-nowrap">
+                <td className="hidden whitespace-nowrap px-4 py-3 text-slate-400 lg:table-cell">
                   {u.last_login_at
                     ? new Date(u.last_login_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
                     : <span className="text-slate-600">Never</span>
@@ -145,7 +153,7 @@ export default function UserTable({
                 </td>
 
                 {/* Actions */}
-                <td className="px-4 py-3">
+                <td className="px-2 py-3 sm:px-4">
                   <div className="flex items-center justify-end gap-2">
                     {hasRole('manager', 'administrator') && u.setup_pending && (
                       <div className="flex items-center gap-2">
@@ -173,8 +181,9 @@ export default function UserTable({
                     {canDelete && u.id !== currentUserId && (
                       <button
                         onClick={() => setConfirm(u)}
-                        className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 transition-all p-1.5 rounded-lg hover:bg-red-500/10"
+                        className="text-slate-500 transition-all hover:bg-red-500/10 hover:text-red-400 p-1.5 rounded-lg sm:opacity-0 sm:group-hover:opacity-100"
                         title="Delete user"
+                        aria-label={`Delete ${u.username}`}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

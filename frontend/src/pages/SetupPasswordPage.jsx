@@ -34,7 +34,7 @@ export default function SetupPasswordPage() {
 
   return (
     <div className="auth-bg flex min-h-screen items-center justify-center p-4">
-      <div className="glass-card w-full max-w-md p-8">
+      <div className="glass-card w-full max-w-md p-5 sm:p-8">
         <div className="mb-7 text-center">
           <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15">
             {complete

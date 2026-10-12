@@ -10,8 +10,9 @@ import LoginForm      from '../components/LoginForm';
 import TwoFactorModal from '../components/TwoFactorModal';
 import QRSetupModal   from '../components/QRSetupModal';
 import EmailOTPModal  from '../components/EmailOTPModal';
+import PasswordRecovery from '../components/PasswordRecovery';
 
-// step: 'credentials' | 'qr-setup' | 'totp' | 'email-otp'
+// step: 'credentials' | 'qr-setup' | 'totp' | 'email-otp' | 'password-recovery'
 export default function LoginPage() {
   const { login }          = useAuth();
   const navigate           = useNavigate();
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [pendingToken, setToken] = useState('');
   const [qrData, setQrData]     = useState({ qrDataUrl: '', manualCode: '' });
   const [maskedEmail, setMaskedEmail] = useState('');
+  const [recoveryUsername, setRecoveryUsername] = useState('');
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
 
@@ -43,6 +45,12 @@ export default function LoginPage() {
     } else if (data.requires2FA) {
       setStep('totp');
     }
+  };
+
+  const handleForgotPassword = (username) => {
+    setRecoveryUsername(username.trim());
+    setError('');
+    setStep('password-recovery');
   };
 
   // ── Step 2a: QR confirmed → go to TOTP entry ────────────────────────────────
@@ -128,6 +136,7 @@ export default function LoginPage() {
     'qr-setup':    { title: 'Secure your account',  sub: 'One-time 2FA setup' },
     'totp':        { title: 'Two-Factor Auth',       sub: 'Enter your authenticator code' },
     'email-otp':   { title: 'Email Verification',    sub: 'Backup two-factor authorization' },
+    'password-recovery': { title: 'Recover your account', sub: 'Reset your password by email' },
   };
 
   return (
@@ -140,7 +149,7 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md relative">
         {/* Card */}
-        <div className="glass-card p-8 animate-slide-up">
+        <div className="glass-card p-5 animate-slide-up sm:p-8">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-14 h-14 bg-emerald-500/15 rounded-2xl mb-4">
@@ -152,7 +161,7 @@ export default function LoginPage() {
 
           {/* Step indicator dots */}
           <div className="flex justify-center gap-2 mb-7">
-            {['credentials', 'qr-setup', 'totp', 'email-otp'].map((s) => (
+            {['credentials', 'qr-setup', 'totp', 'email-otp', 'password-recovery'].map((s) => (
               <div
                 key={s}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
@@ -172,7 +181,18 @@ export default function LoginPage() {
 
           {/* Render current step */}
           {step === 'credentials' && (
-            <LoginForm onSuccess={handleCredentials} onError={setError} />
+            <LoginForm
+              onSuccess={handleCredentials}
+              onError={setError}
+              onForgotPassword={handleForgotPassword}
+              initialUsername={recoveryUsername}
+            />
+          )}
+          {step === 'password-recovery' && (
+            <PasswordRecovery
+              initialUsername={recoveryUsername}
+              onBack={() => { setStep('credentials'); setError(''); }}
+            />
           )}
           {step === 'qr-setup' && (
             <QRSetupModal

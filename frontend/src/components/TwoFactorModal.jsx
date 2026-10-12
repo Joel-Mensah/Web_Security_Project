@@ -101,7 +101,7 @@ export default function TwoFactorModal({ onVerify, onBack, onSwitchToEmail, load
       </p>
 
       {/* OTP digit boxes */}
-      <div className="flex gap-2 justify-center mb-6" onPaste={handlePaste}>
+      <div className="flex justify-center gap-1.5 mb-6 sm:gap-2" onPaste={handlePaste}>
         {digits.map((d, i) => (
           <input
             key={i}

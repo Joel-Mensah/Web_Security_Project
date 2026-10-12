@@ -52,6 +52,13 @@ async function applyMigration(database) {
   await database.query(syncSql);
 }
 
+async function applyMigrations() {
+  const remote = getRemotePool();
+  await applyMigration(localPool);
+  await applyMigration(remote);
+  console.log('[SYNC] Database migrations applied to local and Supabase databases.');
+}
+
 async function getNodeState(database) {
   const { rows } = await database.query(
     `SELECT node_id, peer_cursor, initial_sync_completed,
@@ -68,7 +75,12 @@ function buildUpsert(table, payload) {
   if (!columns || !payload || typeof payload !== 'object' || !payload.id) {
     throw new Error(`Unsupported synchronization row for table "${table}"`);
   }
-  const values = columns.map((column) => payload[column] === undefined ? null : payload[column]);
+  const values = columns.map((column) => {
+    if (column === 'credential_setup_required' && payload[column] == null) {
+      return Boolean(payload.password_setup_token_hash && !payload.last_login_at);
+    }
+    return payload[column] === undefined ? null : payload[column];
+  });
   const parameters = columns.map((_, index) => `$${index + 1}`).join(', ');
   const updates = columns
     .filter((column) => column !== 'id')
@@ -135,8 +147,7 @@ async function importTable(remote, local, table, cursorColumn, doneColumn) {
 
 async function bootstrap() {
   const remote = getRemotePool();
-  await applyMigration(localPool);
-  await applyMigration(remote);
+  await applyMigrations();
 
   let localState = await getNodeState(localPool);
   if (!localState.initial_sync_completed) {
@@ -403,7 +414,7 @@ async function syncOnce() {
         `local → Supabase: ${pushed.applied} applied, ${pushed.conflicts} conflicts`
       );
     }
-  })();
+  });
   syncPromise = currentSync;
   try {
     return await currentSync;
@@ -435,9 +446,9 @@ function startSyncCron() {
     throw new Error('SUPABASE_DATABASE_URL must be configured before starting synchronization');
   }
   if (!cron.validate(SYNC_CRON)) throw new Error(`Invalid SYNC_CRON schedule: ${SYNC_CRON}`);
-  return localPool.query(
+  return applyMigrations().then(() => localPool.query(
     'SELECT 1 FROM sync_node WHERE singleton = TRUE AND initial_sync_completed = TRUE'
-  ).then(({ rows }) => {
+  )).then(({ rows }) => {
     if (!rows.length) {
       throw new Error('Run npm run sync:bootstrap before starting the application');
     }
@@ -579,6 +590,7 @@ async function close() {
 
 module.exports = {
   bootstrap,
+  applyMigrations,
   close,
   ensureCloudOnline,
   getOpenConflicts,

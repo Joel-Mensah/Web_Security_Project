@@ -15,9 +15,9 @@ const localSyncEnabled = import.meta.env.VITE_LOCAL_SYNC_ENABLED !== 'false';
 // Layout wrapper for authenticated pages
 function AppLayout() {
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden md:flex-row">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto">
+      <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
         <Outlet />
       </main>
     </div>
