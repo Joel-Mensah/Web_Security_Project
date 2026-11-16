@@ -1,0 +1,81 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: GitHub Actions OIDC role for publishing Enterprise Auth releases to AWS.
+
+Parameters:
+  GitHubRepository:
+    Type: String
+    Default: Joel-Mensah/Web_Security_Project
+    AllowedPattern: '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$'
+  GitHubBranch:
+    Type: String
+    Default: main
+  ReleaseBucketName:
+    Type: String
+  CloudFrontDistributionId:
+    Type: String
+  ElasticBeanstalkApplicationName:
+    Type: String
+  ElasticBeanstalkEnvironmentName:
+    Type: String
+
+Resources:
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+              StringLike:
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepository}:ref:refs/heads/${GitHubBranch}'
+      Policies:
+        - PolicyName: PublishApplicationReleases
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ListReleaseBucket
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ReleaseBucketName}'
+              - Sid: UploadReleaseArtifacts
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ReleaseBucketName}/releases/*'
+              - Sid: CreateApiVersions
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:CreateApplicationVersion
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:elasticbeanstalk:${AWS::Region}:${AWS::AccountId}:application/${ElasticBeanstalkApplicationName}'
+                  - !Sub 'arn:${AWS::Partition}:elasticbeanstalk:${AWS::Region}:${AWS::AccountId}:applicationversion/${ElasticBeanstalkApplicationName}/release-*'
+              - Sid: SelectApiVersion
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:UpdateEnvironment
+                Resource: !Sub 'arn:${AWS::Partition}:elasticbeanstalk:${AWS::Region}:${AWS::AccountId}:environment/${ElasticBeanstalkApplicationName}/${ElasticBeanstalkEnvironmentName}'
+              - Sid: InspectApiVersionsAndEnvironment
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:DescribeApplicationVersions
+                  - elasticbeanstalk:DescribeEnvironments
+                Resource: '*'
+              - Sid: UpdateFrontendDistribution
+                Effect: Allow
+                Action:
+                  - cloudfront:GetDistribution
+                  - cloudfront:GetDistributionConfig
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:CreateInvalidation
+                Resource: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionId}'
+
+Outputs:
+  GitHubDeployRoleArn:
+    Value: !GetAtt GitHubDeployRole.Arn

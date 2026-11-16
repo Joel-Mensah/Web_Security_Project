@@ -1,11 +1,13 @@
 // src/components/Sidebar.jsx
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, ScrollText, LogOut, Shield, ChevronLeft, ChevronRight, AlertTriangle,
+  LayoutDashboard, Users, ScrollText, LogOut, Shield, ChevronLeft, ChevronRight,
+  ClipboardList, Plug2,
   Menu, X,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import ThemeToggle from './ThemeToggle';
 
 const ROLE_COLORS = {
   inputer:       'bg-slate-500/20 text-slate-300',
@@ -21,8 +23,6 @@ const ROLE_LABELS = {
   administrator: 'Administrator',
 };
 
-const localSyncEnabled = import.meta.env.VITE_LOCAL_SYNC_ENABLED !== 'false';
-
 export default function Sidebar() {
   const { user, logout, hasRole } = useAuth();
   const navigate                  = useNavigate();
@@ -31,11 +31,11 @@ export default function Sidebar() {
 
   const navItems = [
     { to: '/dashboard',       icon: LayoutDashboard, label: 'Dashboard',       always: true },
+    { to: '/incidents',       icon: ClipboardList,    label: 'Incident reports', always: true },
+    { to: '/integrations',    icon: Plug2,            label: 'Integrations',   always: true },
     { to: '/users',           icon: Users,            label: 'User Management', roles: ['manager', 'admin', 'administrator'] },
     { to: '/audit',           icon: ScrollText,       label: 'Audit Logs',      roles: ['administrator'] },
-    ...(localSyncEnabled
-      ? [{ to: '/sync-conflicts', icon: AlertTriangle, label: 'Sync Conflicts', roles: ['administrator'] }]
-      : []),
+    { to: '/system',          icon: Shield,            label: 'System operations', roles: ['administrator'] },
   ].filter(item => item.always || hasRole(...(item.roles || [])));
 
   const handleLogout = async () => {
@@ -46,22 +46,25 @@ export default function Sidebar() {
 
   return (
     <>
-      <header className="flex items-center justify-between border-b border-white/5 bg-navy-950/90 px-4 py-3 md:hidden">
+      <header className="flex items-center justify-between border-b border-black/5 bg-white/90 px-4 py-3 dark:border-white/5 dark:bg-navy-950/90 md:hidden">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20">
             <Shield className="h-4 w-4 text-emerald-400" />
           </div>
-          <span className="truncate font-bold tracking-tight text-white">EnterpriseAuth</span>
+          <span className="truncate font-bold tracking-tight text-slate-900 dark:text-white">EnterpriseAuth</span>
         </div>
-        <button
-          type="button"
-          onClick={() => setMobileOpen(open => !open)}
-          className="rounded-lg p-2 text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
-          aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
-          aria-expanded={mobileOpen}
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <ThemeToggle compact />
+          <button
+            type="button"
+            onClick={() => setMobileOpen(open => !open)}
+            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-black/5 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white"
+            aria-label={mobileOpen ? 'Close navigation menu' : 'Open navigation menu'}
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </header>
 
       {mobileOpen && (
@@ -114,7 +117,18 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <div className="space-y-2 border-t border-white/5 p-3">
+        <div className="space-y-2 border-t border-black/5 p-3 dark:border-white/5">
+          {!collapsed && (
+            <div className="flex items-center justify-between px-2 py-1">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Theme</span>
+              <ThemeToggle compact />
+            </div>
+          )}
+          {collapsed && (
+            <div className="hidden justify-center md:flex">
+              <ThemeToggle compact />
+            </div>
+          )}
           {user && (
             <div className={`px-2 py-2 ${collapsed ? 'md:hidden' : ''}`}>
               <p className="truncate text-sm font-medium text-white">{user.username}</p>

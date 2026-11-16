@@ -4,7 +4,9 @@ A production-grade, full-stack web application featuring:
 - **Argon2id** password hashing with per-user **Salt** + env-only **Pepper**
 - **TOTP-based 2FA** (Google Authenticator / Authy compatible)
 - **Role-Based Access Control** — Inputer, Manager, Admin, Administrator
-- **Encrypted local backups** via AES-256-CBC + `pg_dump`
+- **Security incident reporting** — triage queue, severity, assignments, private notes, and response timeline
+- **Encrypted database backups** in private Supabase Storage
+- **AWS application restore points** for Elastic Beanstalk and CloudFront releases, without changing database records
 - **React + Tailwind** glassmorphism UI with animated 2FA modal
 
 ---
@@ -26,34 +28,22 @@ Computer Security/
 | Tool         | Version  | Download |
 |---|---|---|
 | Node.js      | ≥ 18.0   | https://nodejs.org |
-| PostgreSQL   | ≥ 14     | https://www.postgresql.org/download/ |
 | npm          | ≥ 9      | Bundled with Node |
 
 ---
 
 ## 🚀 Setup Guide
 
-### 1. Database
+### 1. Hosted Supabase database
 
-The application uses **local PostgreSQL as its primary database**. Set
-`LOCAL_DATABASE_URL` in `backend/.env` to your local PostgreSQL connection.
-Set the existing Supabase connection string as `SUPABASE_DATABASE_URL` in
-`backend/.env`. The application deliberately ignores
-`DATABASE_URL`, so a leftover Supabase URL cannot silently remain the
-application's write target.
+The application uses one hosted Supabase PostgreSQL database in development
+and production. Set its connection string as `SUPABASE_DATABASE_URL` in
+`backend/.env`. The backend rejects localhost database URLs.
 
-```powershell
-# Create the database
-psql -U postgres -c "CREATE DATABASE enterprise_auth;"
-
-# Apply the schema
-psql -U postgres -d enterprise_auth -f "database/schema.sql"
-```
-
-Run `schema.sql` only against a **new, empty local database**: it drops and
-recreates the `users` and `audit_logs` tables. The existing Supabase data remains
-unchanged, but the local database will not contain that data until the
-bootstrap step below.
+For a new, empty Supabase project, run `database/schema.sql` in the Supabase
+SQL Editor. That schema drops and recreates application tables, so never run
+it against a database that contains data. For an existing project, apply the
+additive `database/cloud-only.sql` migration instead.
 
 ### 2. Backend
 
@@ -65,6 +55,24 @@ npm install
 
 # Create your .env file
 copy .env.example .env
+```
+
+To add demo accounts with the Inputer, Manager, Admin, and Administrator
+roles, set `ALLOW_DEMO_SEED=true` for the command and run `npm run seed:demo`.
+Add `-- --skip=administrator` to omit a role.
+The script shows the connected database host and asks you to type
+`ADD DEMO USERS` before it writes anything. Enter an email address you can
+access for each account. It creates random undisclosed passwords and marks
+each created account as requiring password setup. Send each user a setup email
+from User Management while signed in as an Administrator. Do not seed a
+production database.
+
+In PowerShell, run:
+
+```powershell
+$env:ALLOW_DEMO_SEED = "true"
+npm run seed:demo
+Remove-Item Env:ALLOW_DEMO_SEED
 ```
 
 **Edit `.env`** and fill in every value. Generate secrets:
@@ -80,33 +88,14 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Install Google Drive for desktop, sign in to the Google account where you want
-backups, and choose **Mirror files**. Create a dedicated folder inside the
-mirrored Drive directory and set `GOOGLE_DRIVE_SYNC_DIR` in `backend/.env` to
-that folder's absolute Windows path. No Google Cloud project, OAuth client, or
-API credentials are needed.
+Create a private Supabase Storage bucket named `enterprise-auth-backups` (or
+set `SUPABASE_BACKUP_BUCKET` to another bucket name). Keep the service-role key
+and `BACKUP_ENCRYPTION_KEY` on the backend only. Never add them to the
+frontend environment.
 
-### 3. Import existing Supabase data and enable synchronization
+### 3. Create the first Administrator, if needed
 
-The local database must have the application schema and empty `users` and
-`audit_logs` tables. From the `backend` folder, run this one-time bootstrap
-while connected to the internet to import existing Supabase data:
-
-```powershell
-npm run sync:bootstrap
-```
-
-It refuses to overwrite local rows. Thereafter, each backend startup
-automatically applies the idempotent `database/sync.sql` migration to both
-databases before starting synchronization. The backend synchronizes queued
-changes in both directions once a minute by default. Password/2FA setup and
-login require Supabase to be reachable; already-issued access tokens can
-continue to be used against the local app until they expire.
-
-### 4. Create the first Administrator, if needed
-
-The bootstrap copies existing accounts too. Seed an administrator only if
-Supabase did not already have one:
+Seed an administrator only if Supabase does not already have one:
 
 ```powershell
 npm run seed
@@ -114,7 +103,7 @@ npm run seed
 
 Follow the interactive prompts to set username, email, and password.
 
-### 5. Start the backend
+### 4. Start the backend
 
 ```powershell
 npm run dev      # Development (with nodemon)
@@ -124,7 +113,7 @@ npm start        # Production
 
 Server starts at `http://localhost:5000`
 
-### 6. Frontend
+### 5. Frontend
 
 ```powershell
 cd ../frontend
@@ -183,6 +172,42 @@ Hash = Argon2id( password : SECRET_PEPPER : salt )
 | Change roles | ❌ | ❌ | ❌ | ✅ |
 | View audit logs | ❌ | ❌ | ❌ | ✅ |
 
+## 🚨 Security Incident Reporting
+
+Open **Incident reports** after signing in to submit concerns such as suspicious
+messages, possible account compromise, lost devices, malware, or potential data
+exposure. Reports include a title, description, category, and initial severity.
+The reporter can see their own reports and reports assigned to them.
+
+After submission, the reporter sees a confirmation and can edit the report until
+a responder posts a public reply or an Admin or Administrator records a referral for
+investigation. Private responder notes do not lock the reporter out. The
+referral control records the decision in the report timeline and locks further
+edits. It does not send the report to an external authority, so responders
+must use their approved contact process separately.
+
+Managers, Admins, and Administrators can review the full queue, assign an active
+user, adjust severity and status, add private responder notes, and post updates
+visible to the reporter. Marking a report **Resolved** requires a resolution
+summary. All reports include a chronological activity timeline; incident
+changes are also recorded in the security audit log.
+
+The incident API is available under `/api/incidents`:
+
+- `GET /` and `GET /summary` — visibility-scoped inbox and counts
+- `POST /` — submit a report
+- `GET /:id` — view a report and its permitted activity
+- `PATCH /:id` — edit your report before a public response or referral
+- `PATCH /:id/triage` — manager-only status, severity, assignment, and resolution
+- `POST /:id/updates` — add a public comment or manager-only private note
+- `GET /assignees` — list active assignment options for responders
+
+Reports accept up to three PNG, JPEG, or WebP screenshots, up to 5 MB each.
+Redact passwords, verification codes, and unnecessary personal data before
+uploading screenshots. Do not put credentials or unnecessary personal data in
+report descriptions or comments. This feature coordinates reporting and
+response; it does not detect, contain, or guarantee protection from threats.
+
 ---
 
 ## 🔒 Encrypted Backups
@@ -193,62 +218,28 @@ cd backend
 npm run backup
 ```
 
-The command creates an authenticated AES-256-GCM encrypted dump in
-`backend/backups/` and copies the same encrypted file into the mirrored Google
-Drive folder. Google Drive for desktop uploads it to the cloud in the
-background; the application confirms the local copy, not completion of that
-cloud upload. Backups older than `BACKUP_RETENTION_DAYS` are pruned from both
-folders. The
-file format is a 12-byte IV, encrypted SQL bytes, then a 16-byte authentication
-tag. Keep `BACKUP_ENCRYPTION_KEY` separately; without it backups cannot be
-restored. The cron runs daily at midnight by default.
+The command creates an AES-256-GCM encrypted snapshot and uploads it to the
+configured private Supabase Storage bucket. The administrator dashboard also
+has a button to start a backup and view backup history. The backup includes
+account, password-reset, audit, and incident records. It does not expose
+password hashes, salts, or other credential data in the dashboard.
 
-To decrypt a current GCM backup before restoring it with `psql`, run this from
-the backend folder and choose a secure output path for the plaintext SQL:
+Application restore points are separate from database backups. The dashboard
+can roll back the production frontend and API to deployments made from the
+same Git commit. This changes deployed application code only. It does not
+restore or alter database records.
 
-```js
-const crypto = require('crypto');
-const fs = require('fs');
-require('dotenv').config();
-const file = fs.readFileSync(process.argv[2]);
-const key = Buffer.from(process.env.BACKUP_ENCRYPTION_KEY, 'hex');
-const iv = file.subarray(0, 12);
-const tag = file.subarray(file.length - 16);
-const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-decipher.setAuthTag(tag);
-const sql = Buffer.concat([
-  decipher.update(file.subarray(12, file.length - 16)),
-  decipher.final(),
-]);
-fs.writeFileSync(process.argv[3], sql, { mode: 0o600 });
-```
+Backups require `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+`SUPABASE_BACKUP_BUCKET`, and a 64-character hex `BACKUP_ENCRYPTION_KEY`.
+Create the bucket as private before using the feature.
 
-For example, save the snippet as a temporary local script and run
-`node decrypt.js backups/backup-<timestamp>.sql.enc restored.sql`, then restore
-with `psql -U postgres -d enterprise_auth -f restored.sql`. Securely remove the
-plaintext SQL after use. Backups created by the older AES-256-CBC implementation
-use a different format and need its previous decryption instructions.
-
-## 🔄 Supabase Synchronization
-
-Changes to `users` and `audit_logs` are captured in a PostgreSQL outbox on each
-database. Sync applies acknowledged changes idempotently and prevents
-echo-triggered changes from being re-queued. Concurrent edits and account
-uniqueness conflicts are preserved for review instead of silently overwriting
-a row.
-
-Administrators can review and resolve conflicts in the app under **Sync
-Conflicts**, or via `GET /api/sync/conflicts` and
-`POST /api/sync/conflicts/:id/resolve` (`resolution` is `local` or `supabase`).
-The selected version is queued to propagate to both databases.
-
-`database/sync.sql` is a non-destructive migration applied automatically at
-backend startup; do not rerun `database/schema.sql` against Supabase.
-`npm run sync:bootstrap` is only needed once to copy existing Supabase data to
-an empty local database.
-Synchronization currently covers only `users` and `audit_logs`. New tables
-need matching change capture and conflict handling before they can be used
-offline.
+Incident reports accept up to three PNG, JPEG, or WebP screenshots, up to
+5 MB each. Use a private S3 evidence bucket with public access blocked and
+server-side encryption enabled. The Elastic Beanstalk instance role can
+upload, view, and remove objects under the incident evidence prefix. The API
+checks that S3 blocks public access before it uploads or signs a viewing link.
+Links expire after 60 seconds. Ask users to redact credentials and personal
+information from screenshots before upload.
 
 ## ✉️ New-user password setup emails
 
@@ -256,41 +247,147 @@ When creating a user, administrators and managers can choose **Send Setup
 Link**. The email includes the user's username and a single-use password setup
 link that expires after 30 minutes. The user chooses their own password; no
 password is sent by email. The temporary token is stored only as a SHA-256 hash
-and is synchronized to Supabase before the email is delivered. After setting a
+and is saved in the hosted database before the email is delivered. After setting a
 password, the user signs in and completes the existing TOTP/Email OTP setup.
 
 Set `ACCOUNT_SETUP_URL` to the public frontend origin when local administrators
-send invitations for the hosted site (for example, the Vercel frontend URL).
+send invitations for the hosted site (for example, the AWS CloudFront URL).
 When omitted, the email link uses `FRONTEND_URL`. The Gmail sender's
 `GMAIL_USER` and `GMAIL_APP_PASSWORD` must be configured.
 
-## ☁️ Deploying the hosted app to Vercel
+## ☁️ Deploying and restoring on AWS
 
-Deploy this repository as **two Vercel projects** so the Vite frontend and
-Express API can use their appropriate build/runtime settings:
+The AWS setup keeps PostgreSQL on Supabase. Elastic Beanstalk runs the Express
+API, and a private S3 bucket plus CloudFront serves the React app and stores
+release files. CloudFront sends `/api/*` requests to the API. Application
+rollback switches the API version and the frontend release path. It does not
+restore or change Supabase records.
 
-1. Import this Git repository into Vercel twice.
-2. For the frontend project, set **Root Directory** to `frontend` and deploy
-   with the Vite defaults. Add `VITE_API_URL` as
-   `https://<your-backend-project>.vercel.app/api` and set
-   `VITE_LOCAL_SYNC_ENABLED` to `false`.
-3. For the backend project, set **Root Directory** to `backend`. Its
-   `api/index.js` serverless entry serves Express through the rewrite in
-   `backend/vercel.json`. The serverless instance connects to Supabase and does
-   not start the local sync or backup cron jobs.
-4. Add the backend environment variables in the Vercel project settings:
-   `DATABASE_URL` and `SUPABASE_DATABASE_URL` (the Supabase PostgreSQL
-   connection string), `JWT_SECRET`, `SECRET_PEPPER`, `JWT_EXPIRES_IN`,
-   `JWT_2FA_PENDING_EXPIRES_IN`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, and
-   `FRONTEND_URL` (the deployed frontend's HTTPS URL).
-5. Keep the existing local `.env` private. Do not add local database settings,
-   Google Drive paths, or database credentials to the frontend project.
+The AWS deployment workflow runs when a commit reaches `main`. It builds both
+apps, uploads a release to S3, updates the Elastic Beanstalk environment,
+switches the CloudFront frontend origin path, and records a restore manifest.
+The workflow uses GitHub's OpenID Connect role. It does not use saved AWS
+access keys.
 
-Vercel cannot connect to PostgreSQL on your computer. The hosted site uses
-Supabase while the local development server continues using local PostgreSQL
-and synchronizing changes to Supabase. Keep the local server online to continue
-local sync; Vercel does not run `pg_dump`, scheduled backups, or the local
-Google Drive for desktop backup job.
+Set up AWS once before enabling the workflow. This project can incur charges
+for Elastic Beanstalk, S3, and CloudFront. A Budget alert is optional and does
+not stop resources or cap spending. If you do not create a budget, monitor
+charges in the AWS Billing console.
+
+1. Protect the AWS root account with MFA. Create an IAM Identity Center user
+   and sign in with that user for setup. Do not create root access keys or put
+   AWS credentials in chat, Git, or the frontend.
+2. Install AWS CLI v2 on your Windows computer. In PowerShell, configure an
+   IAM Identity Center profile and verify the account:
+
+   ```powershell
+   aws configure sso --profile project-deploy
+   aws sso login --profile project-deploy
+   $env:AWS_PROFILE = "project-deploy"
+   $env:AWS_REGION = "us-east-1"
+   aws sts get-caller-identity
+   ```
+
+   Check that the account ID is yours and the region is `us-east-1`.
+3. Check Elastic Beanstalk for an existing application and environment before
+   creating anything. Reuse the existing `enterprise-auth` application and
+   `enterprise-auth-prod` environment in `us-east-1` if they are present.
+   Record the environment CNAME and platform. Deploy the real API version
+   before treating the environment as ready for users.
+4. AWS must verify the account before CloudFront can create new distributions.
+   In this account, CloudFront creation returned an account-verification error,
+   and support case `179224908700230` is pending AWS action. Do not retry this
+   stack until AWS clears the restriction. After verification, deploy the web
+   hosting stack. Replace the example API origin with the Beanstalk CNAME,
+   without `https://`:
+
+   ```powershell
+   $ApiOrigin = "your-environment.us-east-1.elasticbeanstalk.com"
+   $EvidenceBucket = "joel-web-security-incident-evidence-592229131693"
+   aws cloudformation deploy `
+     --template-file infra/aws/hosting.yaml `
+     --stack-name enterprise-auth-hosting `
+     --parameter-overrides ApiOriginDomain=$ApiOrigin IncidentEvidenceBucketName=$EvidenceBucket `
+     --region us-east-1
+   ```
+
+   Save the stack outputs `FrontendBucketName`,
+   `IncidentEvidenceBucketName`, `CloudFrontDistributionId`, and `FrontendUrl`.
+   The evidence bucket output should match `$EvidenceBucket`.
+   Give the Elastic Beanstalk service role `s3:GetObject` access to
+   `arn:aws:s3:::<FrontendBucketName>/releases/*`. Beanstalk needs to read the
+   API bundles that GitHub uploads.
+5. Create the API's EC2 instance role from
+   `infra/aws/backend-restore-role.yaml`:
+
+   ```powershell
+   aws cloudformation deploy `
+     --template-file infra/aws/backend-restore-role.yaml `
+     --stack-name enterprise-auth-runtime `
+     --capabilities CAPABILITY_IAM `
+     --parameter-overrides ReleaseBucketName=<FrontendBucketName> IncidentEvidenceBucketName=<IncidentEvidenceBucketName> CloudFrontDistributionId=<CloudFrontDistributionId> ElasticBeanstalkApplicationName=enterprise-auth ElasticBeanstalkEnvironmentName=enterprise-auth-prod `
+     --region us-east-1
+   ```
+
+   Replace the angle-bracketed values with the stack outputs. In Elastic
+   Beanstalk, set the EC2 instance profile to the new stack's
+   `InstanceProfileName` output. This role lets the API read release manifests
+   and request AWS rollbacks.
+6. Add the backend environment settings in Elastic Beanstalk. Use the required
+   values from `backend/.env.example`, including `SUPABASE_DATABASE_URL`,
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BACKUP_BUCKET`,
+   `AWS_INCIDENT_EVIDENCE_BUCKET` to `$EvidenceBucket`,
+   `BACKUP_ENCRYPTION_KEY`, `JWT_SECRET`, `SECRET_PEPPER`, `GMAIL_USER`,
+   `GMAIL_APP_PASSWORD`, `NODE_ENV=production`, and `FRONTEND_URL`. Also set
+   `AWS_REGION`, `AWS_RELEASES_BUCKET` to the frontend bucket name,
+   `AWS_EB_APPLICATION_NAME`, `AWS_EB_ENVIRONMENT_NAME`, and
+   `AWS_FRONTEND_DISTRIBUTION_ID`. Keep all secrets in AWS environment
+   configuration, not in Git.
+7. In IAM, create an OpenID Connect provider if your AWS account does not have
+   one. Use `https://token.actions.githubusercontent.com` as its URL and
+   `sts.amazonaws.com` as its audience. Deploy
+   `infra/aws/github-deploy-role.yaml` with the repository, branch, bucket,
+   CloudFront distribution ID, and Beanstalk names:
+
+   ```powershell
+   aws cloudformation deploy `
+     --template-file infra/aws/github-deploy-role.yaml `
+     --stack-name enterprise-auth-github-deploy `
+     --capabilities CAPABILITY_IAM `
+     --parameter-overrides GitHubRepository=Joel-Mensah/Web_Security_Project GitHubBranch=main ReleaseBucketName=<FrontendBucketName> CloudFrontDistributionId=<CloudFrontDistributionId> ElasticBeanstalkApplicationName=enterprise-auth ElasticBeanstalkEnvironmentName=enterprise-auth-prod `
+     --region us-east-1
+   ```
+
+   Replace the angle-bracketed values. Set the GitHub repository secret
+   `AWS_DEPLOY_ROLE_ARN` to the `GitHubDeployRoleArn` output. Set these
+   repository Actions variables: `AWS_REGION`, `AWS_RELEASES_BUCKET`,
+   `AWS_EB_APPLICATION_NAME`, `AWS_EB_ENVIRONMENT_NAME`, and
+   `AWS_FRONTEND_DISTRIBUTION_ID`.
+8. Push a commit to `main`. GitHub Actions publishes it to AWS and creates the
+   first restore point. Verify login, 2FA, email setup links, user management,
+   and incident reports on the CloudFront URL before changing your public
+   frontend address. Keep Vercel available until that check passes, then turn
+   off its automatic deployments.
+
+The administrator restore page uses the Elastic Beanstalk instance role.
+Local development needs AWS credentials from the standard AWS CLI profile
+chain if you want to load or trigger restore points locally. Never put AWS
+access keys in `backend/.env.example` or frontend variables.
+
+The backend stores encrypted database backups in private Supabase Storage.
+Application release history is separate and stored in the private S3 hosting
+bucket. Set up the private Supabase bucket and `BACKUP_ENCRYPTION_KEY` as
+described in [Encrypted Backups](#-encrypted-backups).
+AWS charges for the running Beanstalk environment, S3 storage, and CloudFront
+traffic. Check your account budget before enabling production resources.
+
+Apply `database/cloud-only.sql` in the Supabase SQL Editor after deploying
+schema changes. It adds the current application tables and fields, and disables
+legacy change-capture triggers without deleting existing sync metadata or
+database records. This migration adds the incident response and referral
+timestamps used to lock reporter edits. Do not run `database/schema.sql` against an existing
+production database. Local development connects directly to hosted Supabase,
+so it does not need a local PostgreSQL server or a database sync process.
 
 ---
 
@@ -307,8 +404,9 @@ Google Drive for desktop backup job.
 | Security headers | Helmet.js |
 | SQL injection | Parameterised queries (`pg` pool) |
 | Backup encryption | AES-256-GCM with random per-backup IV and authentication tag |
-| Backup destination | Local encrypted copy plus Google Drive for desktop mirror |
-| Offline access | Existing JWT sessions work locally; login and 2FA require Supabase connectivity |
+| Backup destination | AES-256-GCM encrypted snapshots in private Supabase Storage |
+| Database | Hosted Supabase PostgreSQL for local development and production |
+| Application restore | Elastic Beanstalk API rollback and CloudFront frontend rollback, database records unchanged |
 | Audit logging | All auth events + role changes written to `audit_logs` |
 
 ---
@@ -331,6 +429,8 @@ Google Drive for desktop backup job.
 | DELETE | `/api/users/:id` | JWT | Admin, Administrator |
 | PATCH | `/api/users/:id/role` | JWT | Administrator |
 | GET  | `/api/users/logs/audit` | JWT | Administrator |
-| GET  | `/api/sync/conflicts` | JWT | Administrator |
-| POST | `/api/sync/conflicts/:id/resolve` | JWT | Administrator |
+| GET | `/api/system/backups` | JWT | Administrator |
+| POST | `/api/system/backups` | JWT | Administrator |
+| GET | `/api/system/restore-points` | JWT | Administrator |
+| POST | `/api/system/restore-points` | JWT | Administrator |
 | GET  | `/health` | None | — |

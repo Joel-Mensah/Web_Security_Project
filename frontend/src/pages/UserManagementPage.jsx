@@ -1,6 +1,9 @@
 // src/pages/UserManagementPage.jsx
 import { useState, useEffect, useCallback } from 'react';
-import { UserPlus, Search, RefreshCw, ChevronLeft, ChevronRight, Loader2, Mail, CheckCircle } from 'lucide-react';
+import {
+  UserPlus, Search, RefreshCw, ChevronLeft, ChevronRight, Loader2, Mail,
+  CheckCircle, LockKeyhole, ShieldCheck,
+} from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import client from '../api/client';
 import UserTable from '../components/UserTable';
@@ -117,6 +120,8 @@ function AddUserModal({ onClose, onCreated }) {
 export default function UserManagementPage() {
   const { user: currentUser, hasRole } = useAuth();
   const [users, setUsers]     = useState([]);
+  const [securityOverview, setSecurityOverview] = useState(null);
+  const [securityError, setSecurityError] = useState('');
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState('');
   const [page, setPage]       = useState(1);
@@ -127,6 +132,7 @@ export default function UserManagementPage() {
 
   const canAdd    = hasRole('manager', 'administrator');
   const canDelete = hasRole('admin',   'administrator');
+  const canViewSecurity = hasRole('admin', 'administrator');
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -139,6 +145,13 @@ export default function UserManagementPage() {
   }, [page]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
+
+  useEffect(() => {
+    if (!canViewSecurity) return;
+    client.get('/users/security-overview')
+      .then(({ data }) => setSecurityOverview(data))
+      .catch(() => setSecurityError('Password protection details are unavailable.'));
+  }, [canViewSecurity]);
 
   const handleDelete = async (id) => {
     try {
@@ -205,6 +218,61 @@ export default function UserManagementPage() {
           )}
         </div>
       </div>
+
+      {canViewSecurity && (
+        <section className="glass-card space-y-4 p-4 sm:p-5" aria-labelledby="credential-security-title">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300">
+              <ShieldCheck className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 id="credential-security-title" className="font-semibold text-white">Password protection</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Passwords cannot be viewed or recovered. Users set or reset their own passwords through a secure link.
+              </p>
+            </div>
+          </div>
+          {securityError ? (
+            <p role="alert" className="text-sm text-amber-300">{securityError}</p>
+          ) : securityOverview ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                <p className="text-xs text-slate-500">Password hashing</p>
+                <p className="mt-1 text-sm font-medium text-white">
+                  {securityOverview.passwordHashing.algorithm}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  64 MiB memory, {securityOverview.passwordHashing.iterations} iterations
+                </p>
+              </div>
+              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                <p className="text-xs text-slate-500">Per-user salt</p>
+                <p className="mt-1 text-sm font-medium text-white">
+                  {securityOverview.salt.bytesPerUser} random bytes
+                </p>
+                <p className="mt-1 text-xs text-slate-400">Unique for each account</p>
+              </div>
+              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                <p className="text-xs text-slate-500">Server pepper</p>
+                <p className={`mt-1 text-sm font-medium ${securityOverview.pepper.configured ? 'text-emerald-300' : 'text-amber-300'}`}>
+                  {securityOverview.pepper.configured ? 'Configured' : 'Not configured'}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">Kept in backend environment</p>
+              </div>
+              <div className="rounded-xl border border-white/5 bg-white/[0.03] p-3">
+                <p className="text-xs text-slate-500">Plaintext passwords</p>
+                <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-white">
+                  <LockKeyhole className="h-4 w-4 text-emerald-300" />
+                  Never stored or displayed
+                </p>
+                <p className="mt-1 text-xs text-slate-400">Use password setup or recovery</p>
+              </div>
+            </div>
+          ) : (
+            <div className="skeleton h-20 rounded-xl" aria-label="Loading password protection details" />
+          )}
+        </section>
+      )}
 
       {/* Search */}
       <div className="relative max-w-sm">

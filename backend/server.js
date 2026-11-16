@@ -11,10 +11,10 @@ const rateLimit   = require('express-rate-limit');
 
 const authRouter  = require('./src/routes/auth');
 const usersRouter = require('./src/routes/users');
-const syncRouter  = require('./src/routes/sync');
+const linkedAccountsRouter = require('./src/routes/linkedAccountsIndex');
+const incidentsRouter = require('./src/routes/incidents');
+const systemRouter = require('./src/routes/system');
 const { pool }    = require('./src/config/db');
-const { startBackupCron } = require('./src/scripts/backup');
-const { startSyncCron } = require('./src/services/syncService');
 
 const app  = express();
 const PORT = parseInt(process.env.PORT || '5000', 10);
@@ -83,7 +83,9 @@ app.get('/', (_req, res) => {
 // ─── API Routes ───────────────────────────────────────────────────────────────
 app.use('/api/auth',  authLimiter, authRouter);
 app.use('/api/users', usersRouter);
-app.use('/api/sync',  syncRouter);
+app.use('/api/users', linkedAccountsRouter);
+app.use('/api/incidents', incidentsRouter);
+app.use('/api/system', systemRouter);
 
 // ─── 404 handler ─────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -104,23 +106,7 @@ async function start() {
     await pool.query('SELECT 1');
     console.log('[DB] PostgreSQL connection verified ✅');
   } catch (err) {
-    console.error('[DB] Cannot connect to PostgreSQL. Ensure DB is running and .env is configured.');
-    console.error(err.message);
-    process.exit(1);
-  }
-
-  try {
-    await startSyncCron();
-  } catch (err) {
-    console.error('[SYNC] Cannot start synchronization. Check the local setup.');
-    console.error(err.message);
-    process.exit(1);
-  }
-
-  try {
-    startBackupCron();
-  } catch (err) {
-    console.error('[BACKUP] Cannot start scheduled backups. Check backup configuration.');
+    console.error('[DB] Cannot connect to hosted Supabase. Check SUPABASE_DATABASE_URL.');
     console.error(err.message);
     process.exit(1);
   }

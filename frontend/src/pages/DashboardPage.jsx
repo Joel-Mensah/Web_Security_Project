@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Activity, AlertTriangle, ArrowRight, CheckCircle, Clock3, KeyRound,
+  Activity, ArrowRight, CheckCircle, Clock3, Database, FileWarning, KeyRound,
   Loader2, RefreshCw, ScrollText, ShieldCheck, UserPlus, Users,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
@@ -26,21 +26,26 @@ const ROLE_PERMISSIONS = {
     'Sign in with two-factor authentication',
     'Recover your account by email',
     'View your account security status',
+    'Report security concerns and follow your own reports',
   ],
   manager: [
     'Create Inputer accounts',
     'View the user directory',
     'Send password setup links to Inputer accounts',
+    'Review, assign, and track security incident reports',
   ],
   admin: [
     'View the user directory and account status',
     'Delete Inputer accounts',
     'Review MFA and password setup status',
+    'Review, assign, and track security incident reports',
   ],
   administrator: [
     'Create, delete, and assign roles to accounts',
     'Review the audit trail',
-    'Resolve database synchronization conflicts',
+    'Create encrypted database backups',
+    'Restore application versions without changing database records',
+    'Coordinate security incident response',
   ],
 };
 
@@ -109,7 +114,6 @@ export default function DashboardPage() {
   const [profile, setProfile] = useState(null);
   const [summary, setSummary] = useState(null);
   const [recent, setRecent] = useState([]);
-  const [conflictCount, setConflictCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
@@ -117,8 +121,6 @@ export default function DashboardPage() {
   const role = user?.role?.toLowerCase() || 'inputer';
   const canViewUsers = hasRole('manager', 'admin', 'administrator');
   const isAdministrator = hasRole('administrator');
-  const localSyncEnabled = import.meta.env.VITE_LOCAL_SYNC_ENABLED !== 'false';
-
   const loadDashboard = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
@@ -136,11 +138,6 @@ export default function DashboardPage() {
       requests.push(
         client.get('/users/logs/audit?limit=5').then(({ data }) => setRecent(data))
       );
-      if (localSyncEnabled) {
-        requests.push(
-          client.get('/sync/conflicts').then(({ data }) => setConflictCount(data.conflicts.length))
-        );
-      }
     }
 
     const results = await Promise.allSettled(requests);
@@ -148,7 +145,7 @@ export default function DashboardPage() {
     if (failures.length) setError('Some dashboard information could not be loaded. Refresh to try again.');
     setLoading(false);
     setRefreshing(false);
-  }, [canViewUsers, isAdministrator, localSyncEnabled]);
+  }, [canViewUsers, isAdministrator]);
 
   useEffect(() => {
     loadDashboard();
@@ -166,35 +163,38 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 space-y-6 overflow-y-auto p-4 animate-fade-in sm:space-y-8 sm:p-6 lg:p-8">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-            EnterpriseAuth overview
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold text-white sm:text-3xl">
-              Welcome, <span className="text-emerald-300">{displayName}</span>
-            </h1>
-            <span className={`role-badge ${ROLE_STYLE[role] || ROLE_STYLE.inputer}`}>{role}</span>
+      <header className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-50 via-emerald-100 to-green-50 p-5 sm:p-7 dark:border-emerald-500/30 dark:from-emerald-900/20 dark:via-green-900/20 dark:to-emerald-900/20 shadow-sm">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-emerald-400/10 blur-3xl dark:bg-emerald-400/10" />
+        <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">
+              EnterpriseAuth overview
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl font-bold text-white sm:text-3xl">
+                Welcome, <span className="text-emerald-300">{displayName}</span>
+              </h1>
+              <span className={`role-badge ${ROLE_STYLE[role] || ROLE_STYLE.inputer}`}>{role}</span>
+            </div>
+            <p className="mt-2 text-sm text-slate-900 dark:text-slate-300">{ROLE_INTRO[role] || ROLE_INTRO.inputer}</p>
           </div>
-          <p className="mt-2 text-sm text-slate-400">{ROLE_INTRO[role] || ROLE_INTRO.inputer}</p>
+          <button
+            type="button"
+            onClick={() => loadDashboard(true)}
+            disabled={loading || refreshing}
+            className="btn-ghost flex items-center gap-2 border border-white/10"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => loadDashboard(true)}
-          disabled={loading || refreshing}
-          className="btn-ghost flex items-center gap-2 border border-white/10"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
       </header>
 
-      <section className="relative overflow-hidden rounded-2xl border border-emerald-500/15 bg-gradient-to-br from-emerald-500/10 via-navy-900 to-blue-500/10 p-5 sm:p-7">
-        <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-emerald-400/10 blur-3xl" />
+      <section className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-50 via-emerald-100 to-green-50 p-5 sm:p-7 dark:border-emerald-500/30 dark:from-emerald-900/20 dark:via-green-900/20 dark:to-emerald-900/20">
+        <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-emerald-400/10 blur-3xl dark:bg-emerald-400/10" />
         <div className="relative flex flex-col justify-between gap-5 sm:flex-row sm:items-center">
           <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
               <ShieldCheck className="h-3.5 w-3.5" />
               Account security
             </div>
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                   ? 'Multi-factor authentication is enabled'
                   : 'Complete two-factor authentication setup'}
             </h2>
-            <p className="mt-1 max-w-2xl text-sm text-slate-400">
+            <p className="mt-1 max-w-2xl text-sm text-slate-900">
               Passwords are protected with Argon2id. Two-factor verification adds another check at sign-in.
             </p>
           </div>
@@ -290,6 +290,13 @@ export default function DashboardPage() {
               description={role === 'manager' ? 'Create and support Inputer accounts' : 'Review account status and access'}
             />
           )}
+          <QuickAction
+            to="/incidents"
+            icon={FileWarning}
+            title="Incident reports"
+            description={canViewUsers ? 'Review incoming reports, assign responders, and track resolution' : 'Report a security concern and follow your updates'}
+            tone="amber"
+          />
           {isAdministrator && (
             <QuickAction
               to="/users"
@@ -298,13 +305,12 @@ export default function DashboardPage() {
               description="Create accounts, change roles, and review account status"
             />
           )}
-          {isAdministrator && localSyncEnabled && (
+          {isAdministrator && (
             <QuickAction
-              to="/sync-conflicts"
-              icon={AlertTriangle}
-              title="Synchronization conflicts"
-              description={conflictCount === null ? 'Review local and Supabase differences' : `${conflictCount} open conflict${conflictCount === 1 ? '' : 's'}`}
-              tone="amber"
+              to="/system"
+              icon={Database}
+              title="System backup and restore"
+              description="Create encrypted backups or restore an application version without changing database records"
             />
           )}
           {!canViewUsers && (

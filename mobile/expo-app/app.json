@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Enterprise Auth",
+    "slug": "enterprise-auth-expo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "enterprise-auth-expo",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "ios": { "supportsTablet": true },
+    "android": {
+      "package": "com.enterprise.auth.expo",
+      "usesCleartextTraffic": true
+    },
+    "web": { "bundler": "metro" },
+    "plugins": ["expo-router", "expo-secure-store"],
+    "experiments": { "typedRoutes": true }
+  }
+}

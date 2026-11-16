@@ -1,0 +1,172 @@
+// mobile/expo-app/src/theme/styles2.js — part 2: dashboard/list/detail styles
+import { StyleSheet } from 'react-native';
+import { getColors } from './tokens';
+
+export const styles2 = StyleSheet.create({
+  sectionTitle: { color: getColors('dark').text, fontSize: 18, fontWeight: '800' },
+  sectionSubtitle: { color: getColors('dark').muted, fontSize: 12, marginTop: 4 },
+  statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
+  statCard: {
+    flexGrow: 1, flexBasis: '47%', backgroundColor: getColors('dark').card,
+    borderColor: getColors('dark').cardBorder, borderWidth: 1, borderRadius: 14, padding: 14,
+  },
+  statValue: { color: getColors('dark').text, fontSize: 22, fontWeight: '800' },
+  statLabel: { color: getColors('dark').muted, fontSize: 11, marginTop: 4 },
+  listCard: {
+    backgroundColor: getColors('dark').card, borderColor: getColors('dark').cardBorder,
+    borderWidth: 1, borderRadius: 14, padding: 14, marginTop: 10,
+  },
+  listTitle: { color: getColors('dark').text, fontSize: 14, fontWeight: '700' },
+  listMeta: { color: getColors('dark').muted, fontSize: 12, marginTop: 6 },
+  badge: {
+    alignSelf: 'flex-start', borderRadius: 999,
+    paddingHorizontal: 10, paddingVertical: 4, marginTop: 8, borderWidth: 1,
+  },
+  badgeText: { fontSize: 11, fontWeight: '700' },
+  header: { padding: 20, paddingBottom: 6 },
+  headerTitle: { color: getColors('dark').text, fontSize: 26, fontWeight: '800' },
+  headerMeta: { color: getColors('dark').muted, fontSize: 13, marginTop: 4 },
+  divider: { height: 1, backgroundColor: getColors('dark').cardBorder, marginVertical: 14 },
+  commentBox: {
+    backgroundColor: 'rgba(148, 163, 184, 0.07)', borderRadius: 12,
+    padding: 12, marginTop: 10, borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.14)',
+  },
+  commentAuthor: { color: getColors('dark').text, fontSize: 12, fontWeight: '700' },
+  commentBody: { color: '#cbd5e1', fontSize: 13, marginTop: 4 },
+  commentDate: { color: getColors('dark').muted, fontSize: 11, marginTop: 6 },
+  qrCode: {
+    width: 210, height: 210, borderRadius: 12,
+    backgroundColor: '#fff', alignSelf: 'center', marginVertical: 12,
+  },
+  manualCode: {
+    color: getColors('dark').text, fontSize: 12, textAlign: 'center',
+    backgroundColor: 'rgba(148,163,184,0.10)', borderRadius: 8, padding: 10,
+  },
+  pickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  chip: {
+    borderWidth: 1, borderColor: getColors('dark').cardBorder,
+    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  chipActive: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: getColors('dark').primary,
+  },
+  chipText: { color: getColors('dark').muted, fontSize: 12, fontWeight: '700' },
+  chipTextActive: { color: getColors('dark').primary },
+  tabBar: {
+    flexDirection: 'row', borderTopWidth: 1, borderTopColor: getColors('dark').cardBorder,
+    backgroundColor: getColors('dark').bgSoft, paddingVertical: 10, paddingHorizontal: 8,
+  },
+  tabItem: { flex: 1, alignItems: 'center', paddingVertical: 6, borderRadius: 10 },
+  tabItemActive: { backgroundColor: getColors('dark').bgSoft },
+  tabLabel: { color: getColors('dark').muted, fontSize: 11, fontWeight: '700', marginTop: 2 },
+  tabLabelActive: { color: getColors('dark').primary },
+  tabIcon: { fontSize: 18, color: getColors('dark').muted },
+
+  // ── Integration Center styles ──
+  integrationsHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+    gap: 10,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: getColors('dark').cardBorder,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: getColors('dark').card,
+  },
+  refreshButtonText: { color: getColors('dark').muted, fontSize: 12, fontWeight: '700' },
+  noticeBox: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+    borderColor: 'rgba(16, 185, 129, 0.35)',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 14,
+  },
+  noticeText: { color: '#6ee7b7', fontSize: 13 },
+  providerGrid: { gap: 12 },
+  providerCard: {
+    backgroundColor: getColors('dark').card,
+    borderColor: getColors('dark').cardBorder,
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 4,
+  },
+  providerLogo: {
+    width: 52, height: 52, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 10,
+  },
+  providerLogoIcon: {
+    // icon size slightly smaller than the 52px box for a balanced look
+    fontSize: 26,
+  },
+  providerLogoText: { fontSize: 24 },
+  providerName: { color: getColors('dark').text, fontSize: 16, fontWeight: '800', marginBottom: 4 },
+  providerBlurb: { color: getColors('dark').muted, fontSize: 12, marginBottom: 10 },
+  integrationStatus: { marginBottom: 10 },
+  statusConnected: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusConnectedText: { color: '#6ee7b7', fontSize: 11, fontWeight: '800' },
+  statusDetail: { color: getColors('dark').muted, fontSize: 11 },
+  statusDisconnected: { alignItems: 'center' },
+  statusDisconnectedText: { color: getColors('dark').muted, fontSize: 11 },
+  providerAction: {
+    borderRadius: 10, paddingVertical: 8, alignItems: 'center',
+    borderWidth: 1, borderColor: getColors('dark').cardBorder,
+  },
+  providerActionDisconnect: { borderColor: '#f43f5e', backgroundColor: 'rgba(244, 63, 94, 0.10)' },
+  providerActionText: { fontSize: 12, fontWeight: '800' },
+
+  // ── Connect / Disconnect Modal styles ──
+  modalBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  modalCard: {
+    backgroundColor: getColors('dark').card, borderColor: getColors('dark').cardBorder,
+    borderWidth: 1, borderRadius: 18,
+    margin: 24, padding: 24,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  modalTitle: { color: getColors('dark').text, fontSize: 18, fontWeight: '800' },
+  modalSubtitle: { color: getColors('dark').muted, fontSize: 12, marginTop: 4 },
+  modalClose: { padding: 4 },
+  modalCloseText: { color: getColors('dark').muted, fontSize: 18 },
+  modalForm: { gap: 10, marginBottom: 16 },
+  modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 10 },
+  modalCancel: {
+    borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10,
+    borderWidth: 1, borderColor: getColors('dark').cardBorder,
+  },
+  modalCancelText: { color: getColors('dark').muted, fontSize: 14, fontWeight: '700' },
+  modalConfirm: {
+    borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10,
+    backgroundColor: getColors('dark').primary, alignItems: 'center',
+  },
+  modalConfirmConnect: { backgroundColor: '#10b981' },
+  modalConfirmDisconnect: { backgroundColor: '#f43f5e' },
+  modalConfirmText: { color: '#fff', fontSize: 14, fontWeight: '800' },
+  confirmLastRow: { marginTop: 12, marginBottom: 16 },
+  confirmLastCheckbox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 10, borderWidth: 1, borderColor: '#f59e0b',
+    backgroundColor: 'rgba(245, 158, 11, 0.10)',
+    padding: 10,
+  },
+  confirmLastCheckboxText: { color: '#f59e0b', fontSize: 16 },
+  confirmLastLabel: { color: getColors('dark').text, fontSize: 12 },
+});

@@ -1,7 +1,7 @@
 // src/components/EmailOTPModal.jsx
 // 6-digit Email OTP verification with resend cooldown and return-to-TOTP option
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Mail, Loader2, ArrowLeft, RotateCw } from 'lucide-react';
+import { Mail, Loader2, ArrowLeft, RotateCw, CheckCircle2 } from 'lucide-react';
 
 const DIGITS = 6;
 const RESEND_COOLDOWN = 60; // 60 seconds
@@ -16,6 +16,7 @@ export default function EmailOTPModal({
   const [digits, setDigits] = useState(Array(DIGITS).fill(''));
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN);
   const [isResending, setIsResending] = useState(false);
+  const [sentMessage, setSentMessage] = useState('');
   const inputRefs = useRef([]);
 
   const focusIndex = useCallback((i) => {
@@ -73,6 +74,7 @@ export default function EmailOTPModal({
     try {
       await onResend();
       setCooldown(RESEND_COOLDOWN);
+      setSentMessage('A new code has been sent to your email.');
     } finally {
       setIsResending(false);
     }
@@ -133,6 +135,12 @@ export default function EmailOTPModal({
           <RotateCw className={`w-3.5 h-3.5 ${isResending ? 'animate-spin' : ''}`} />
           {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
         </button>
+        {sentMessage && (
+          <p className="mt-2 text-xs text-emerald-300 flex items-center justify-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            {sentMessage}
+          </p>
+        )}
       </div>
 
       {/* Back to authenticator */}

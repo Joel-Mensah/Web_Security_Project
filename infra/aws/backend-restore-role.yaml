@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: EC2 instance role for the Enterprise Auth Elastic Beanstalk API and restore controls.
+
+Parameters:
+  ReleaseBucketName:
+    Type: String
+  IncidentEvidenceBucketName:
+    Type: String
+  CloudFrontDistributionId:
+    Type: String
+  ElasticBeanstalkApplicationName:
+    Type: String
+  ElasticBeanstalkEnvironmentName:
+    Type: String
+
+Resources:
+  BackendInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/AWSElasticBeanstalkWebTier'
+      Policies:
+        - PolicyName: ApplicationRestoreControls
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadReleaseManifests
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ReleaseBucketName}'
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - releases/*
+              - Sid: ReadReleaseObjects
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${ReleaseBucketName}/releases/*'
+              - Sid: StoreAndReadIncidentEvidence
+                Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${IncidentEvidenceBucketName}/incidents/*'
+              - Sid: VerifyIncidentEvidenceBucketPrivacy
+                Effect: Allow
+                Action:
+                  - s3:GetBucketPublicAccessBlock
+                Resource: !Sub 'arn:${AWS::Partition}:s3:::${IncidentEvidenceBucketName}'
+              - Sid: ReadAndUpdateApiVersions
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:DescribeApplicationVersions
+                Resource: '*'
+              - Sid: UpdateApiEnvironment
+                Effect: Allow
+                Action:
+                  - elasticbeanstalk:UpdateEnvironment
+                Resource: !Sub 'arn:${AWS::Partition}:elasticbeanstalk:${AWS::Region}:${AWS::AccountId}:environment/${ElasticBeanstalkApplicationName}/${ElasticBeanstalkEnvironmentName}'
+              - Sid: UpdateFrontendDistribution
+                Effect: Allow
+                Action:
+                  - cloudfront:GetDistributionConfig
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:CreateInvalidation
+                Resource: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistributionId}'
+
+  BackendInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref BackendInstanceRole
+
+Outputs:
+  InstanceProfileName:
+    Value: !Ref BackendInstanceProfile
+  InstanceRoleName:
+    Value: !Ref BackendInstanceRole

@@ -10,7 +10,7 @@ const { query }             = require('../config/db');
 const { generateSalt, hashPassword } = require('../services/cryptoService');
 const { log, AuditAction }  = require('../services/auditService');
 const { sendAccountSetupLink } = require('../services/emailService');
-const { ensureCloudOnline, syncSetupToken } = require('../services/syncService');
+const { ensureDatabaseOnline } = require('../middleware/requireDatabase');
 const authenticate          = require('../middleware/authenticate');
 const authorizeRole         = require('../middleware/authorizeRole');
 
@@ -29,12 +29,12 @@ function getSetupLinkErrorMessage(err, stage) {
       err.code === 'EAUTH' ||
       err.responseCode === 535
     ) {
-      return 'The Vercel Gmail settings are missing or rejected. Check GMAIL_USER and GMAIL_APP_PASSWORD in the backend project’s Production environment variables, then redeploy the backend.';
+      return 'The Gmail settings are missing or rejected. Check GMAIL_USER and GMAIL_APP_PASSWORD in the backend environment, then redeploy the API.';
     }
     if (['ECONNECTION', 'ETIMEDOUT', 'ESOCKET', 'ENOTFOUND'].includes(err.code)) {
-      return 'The Vercel backend could not connect to Gmail. Check the backend function logs and try again.';
+      return 'The API could not connect to Gmail. Check the backend logs and try again.';
     }
-    return `Gmail could not send the setup email${err.code ? ` (${err.code})` : ''}. Check the backend function logs for details.`;
+    return `Gmail could not send the setup email${err.code ? ` (${err.code})` : ''}. Check the backend logs for details.`;
   }
 
   if (stage === 'audit logging') {
@@ -42,7 +42,7 @@ function getSetupLinkErrorMessage(err, stage) {
   }
 
   if (stage === 'validating setup URL') {
-    return 'The setup page URL is missing or invalid. In the Vercel backend project, set ACCOUNT_SETUP_URL to https://web-security-project-tan.vercel.app for Production, then redeploy the backend.';
+    return 'The setup page URL is missing or invalid. Set ACCOUNT_SETUP_URL to the public frontend URL in the backend environment, then redeploy the API.';
   }
 
   console.error(`[USERS] Setup-link request failed during ${stage} (${err.code || 'NO_CODE'}):`, err.message);
@@ -66,7 +66,13 @@ router.get(
 
       const { rows }       = await query(
         `SELECT id, username, email, role, mfa_enabled, is_active, last_login_at, created_at,
-                (credential_setup_required AND is_active) AS setup_pending
+                (credential_setup_required AND is_active) AS setup_pending,
+                CASE
+                  WHEN password_hash LIKE '$argon2id$%' THEN 'Argon2id'
+                  WHEN password_hash LIKE '$2a$%' OR password_hash LIKE '$2b$%' THEN 'bcrypt'
+                  ELSE 'Unknown'
+                END AS password_algorithm,
+                (salt IS NOT NULL AND salt <> '') AS salt_present
          FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
         [pageSize, offset]
       );
@@ -77,6 +83,30 @@ router.get(
       console.error('[USERS] GET / error:', err.message);
       res.status(500).json({ message: 'Internal server error' });
     }
+  }
+);
+
+router.get(
+  '/security-overview',
+  authorizeRole(['admin', 'administrator']),
+  async (_req, res) => {
+    res.json({
+      passwordHashing: {
+        algorithm: 'Argon2id',
+        memoryCostKiB: 65536,
+        iterations: 3,
+        parallelism: 4,
+      },
+      salt: {
+        bytesPerUser: 16,
+        uniquePerUser: true,
+      },
+      pepper: {
+        configured: Boolean(process.env.SECRET_PEPPER),
+        storage: 'backend environment',
+      },
+      plaintextPasswordsRecoverable: false,
+    });
   }
 );
 
@@ -188,7 +218,7 @@ router.post(
 
     let stage = 'cloud connection';
     try {
-      await ensureCloudOnline();
+      await ensureDatabaseOnline();
       stage = 'loading user account';
       const { rows } = await query(
         'SELECT id, username, email, role, is_active, credential_setup_required FROM users WHERE id = $1',
@@ -216,9 +246,6 @@ router.post(
         [tokenHash, user.id]
       );
 
-      stage = 'synchronizing setup link';
-      await syncSetupToken(user.id, tokenHash);
-
       stage = 'validating setup URL';
       const setupBase = process.env.ACCOUNT_SETUP_URL || process.env.FRONTEND_URL;
       const setupUrl = new URL('/setup-password', setupBase);
@@ -243,9 +270,6 @@ router.post(
       if (!finalizedToken[0]) {
         throw new Error('Password setup link was replaced before delivery completed');
       }
-
-      stage = 'synchronizing final setup expiry';
-      await syncSetupToken(user.id, tokenHash);
 
       stage = 'audit logging';
       await log({

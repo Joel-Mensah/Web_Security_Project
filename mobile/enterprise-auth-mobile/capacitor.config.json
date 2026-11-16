@@ -1,0 +1,6 @@
+{
+  "appId": "com.enterprise.auth",
+  "appName": "Enterprise Auth Mobile",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}

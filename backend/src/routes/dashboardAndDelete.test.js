@@ -22,9 +22,9 @@ jest.mock('../services/emailService', () => ({
   sendAccountSetupLink: jest.fn(),
 }));
 
-jest.mock('../services/syncService', () => ({
-  ensureCloudOnline: jest.fn(),
-  syncSetupToken: jest.fn(),
+jest.mock('../middleware/requireDatabase', () => ({
+  ensureDatabaseOnline: jest.fn(),
+  requireDatabaseOnline: jest.fn(),
 }));
 
 jest.mock('../middleware/authorizeRole', () => () => (_req, _res, next) => next());

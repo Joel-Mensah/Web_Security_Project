@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class', // ThemeProvider injects .dark / .light on <html>
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
@@ -20,6 +21,21 @@ export default {
           500: '#10B981',
           400: '#34d399',
           300: '#6ee7b7',
+        },
+        // CSS-variable backed theme tokens (HSL/RGB with opacity support)
+        surface: {
+          DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
+          border: 'rgb(var(--surface-border) / <alpha-value>)',
+        },
+        ink: {
+          DEFAULT: 'rgb(var(--text-1) / <alpha-value>)',
+          soft: 'rgb(var(--text-2) / <alpha-value>)',
+          faint: 'rgb(var(--text-3) / <alpha-value>)',
+        },
+        brand: {
+          600: 'rgb(var(--accent-1) / <alpha-value>)',
+          500: 'rgb(var(--accent-2) / <alpha-value>)',
+          soft: 'rgb(var(--accent-soft) / <alpha-value>)',
         },
       },
       animation: {

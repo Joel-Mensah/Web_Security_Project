@@ -106,6 +106,11 @@ export default function UserTable({
                       <span className="text-xs bg-slate-500/20 text-slate-400 px-1.5 py-0.5 rounded">You</span>
                     )}
                   </div>
+                  {hasRole('admin', 'administrator') && (
+                    <p className="mt-1 pl-10 text-xs text-slate-500">
+                      {u.password_algorithm || 'Unknown'} · Salt {u.salt_present ? 'present' : 'missing'}
+                    </p>
+                  )}
                 </td>
 
                 {/* Email */}

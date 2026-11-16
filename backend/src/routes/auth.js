@@ -14,7 +14,7 @@ const { generateOTP, hashOTP, verifyOTP } = require('../services/otpService');
 const { sendOTP, sendPasswordResetOTP } = require('../services/emailService');
 const { log, AuditAction } = require('../services/auditService');
 const authenticate       = require('../middleware/authenticate');
-const { requireCloudForAuth } = require('../services/syncService');
+const { requireDatabaseOnline: requireCloudForAuth } = require('../middleware/requireDatabase');
 
 const router = express.Router();
 

@@ -1,4 +1,5 @@
-/* globals.css — Design System + Tailwind Base */
+/* globals.css — Design System + Tailwind Base (dual-theme aware) */
+@import './theme.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -21,46 +22,74 @@
   }
 
   body {
-    background-color: var(--color-navy-900);
-    color: #f8fafc;
+    background-color: rgb(var(--bg-1));
+    color: rgb(var(--text-1));
   }
 
   ::selection {
-    background-color: rgba(16, 185, 129, 0.35);
-    color: #f8fafc;
+    background-color: rgb(var(--accent-1) / 0.35);
+    color: rgb(var(--text-1));
   }
 
   ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: var(--color-navy-800); }
-  ::-webkit-scrollbar-thumb { background: var(--color-slate); border-radius: 3px; }
+  ::-webkit-scrollbar-track { background: rgb(var(--scroll-track)); }
+  ::-webkit-scrollbar-thumb { background: rgb(var(--text-3)); border-radius: 3px; }
 }
 
 @layer components {
-  /* Glass card */
+  /* Glass card — adapts via .dark automatically through CSS vars */
   .glass-card {
-    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl;
+    @apply rounded-2xl backdrop-blur-md border shadow-2xl;
+    background-color: rgb(var(--surface) / 0.6);
+    border-color: rgb(var(--surface-border) / 0.8);
+  }
+  :root.light .glass-card {
+    background-color: rgb(var(--surface) / 0.8);
+    box-shadow: var(--shadow-card);
   }
 
-  /* Emerald primary button */
+  /* Emerald primary button (kept for backward compat) */
   .btn-primary {
     @apply bg-emerald-500 hover:bg-emerald-400 text-white font-semibold
            px-6 py-3 rounded-xl transition-all duration-200
            focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-navy-900
            disabled:opacity-50 disabled:cursor-not-allowed active:scale-95;
   }
+  :root.light .btn-primary {
+    @apply focus:ring-offset-white;
+  }
+
+  /* Brand gradient button (new — indigo/cyan per spec) */
+  .btn-brand {
+    @apply text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed active:scale-95;
+    background-image: linear-gradient(135deg, rgb(var(--accent-1)), rgb(var(--accent-2)));
+    box-shadow: 0 8px 20px -8px rgb(var(--accent-1) / 0.6);
+  }
+  .btn-brand:hover { filter: brightness(1.08); }
 
   /* Ghost button */
   .btn-ghost {
-    @apply text-slate-400 hover:text-white hover:bg-white/5 px-4 py-2 rounded-lg
-           transition-all duration-150 text-sm;
+    @apply px-4 py-2 rounded-lg transition-all duration-150 text-sm;
+    color: rgb(var(--text-2));
+  }
+  .btn-ghost:hover {
+    color: rgb(var(--text-1));
+    background-color: rgb(var(--text-2) / 0.08);
   }
 
   /* Form input */
   .form-input {
-    @apply w-full bg-navy-800/60 border border-white/10 text-white placeholder-slate-500
-           px-4 py-3 rounded-xl outline-none
-           focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500
-           transition-all duration-200 text-sm;
+    @apply w-full px-4 py-3 rounded-xl outline-none transition-all duration-200 text-sm;
+    background-color: rgb(var(--input-bg) / 0.6);
+    border: 1px solid rgb(var(--input-border) / 0.6);
+    color: rgb(var(--text-1));
+  }
+  .form-input::placeholder { color: rgb(var(--text-3)); }
+  .form-input:focus {
+    border-color: rgb(var(--accent-1));
+    box-shadow: 0 0 0 1px rgb(var(--accent-1));
   }
 
   /* Role badge */
@@ -70,34 +99,120 @@
 
   /* Sidebar nav item */
   .nav-item {
-    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-400
-           hover:text-white hover:bg-white/5 transition-all duration-150 text-sm font-medium cursor-pointer;
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-150 text-sm font-medium cursor-pointer;
+    color: rgb(var(--text-2));
+  }
+  .nav-item:hover {
+    color: rgb(var(--text-1));
+    background-color: rgb(var(--text-2) / 0.08);
   }
   .nav-item.active {
-    @apply text-white bg-emerald-500/10 border border-emerald-500/20;
+    color: rgb(var(--text-1));
+    background-color: rgb(var(--accent-1) / 0.1);
+    border: 1px solid rgb(var(--accent-1) / 0.2);
   }
 
   /* Skeleton loading */
   .skeleton {
-    @apply bg-white/5 animate-pulse rounded-lg;
+    @apply animate-pulse rounded-lg;
+    background-color: rgb(var(--text-2) / 0.08);
   }
 }
 
 /* Gradient background for auth page */
 .auth-bg {
-  background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(16,185,129,0.12) 0%, transparent 60%),
-              radial-gradient(ellipse 60% 40% at 80% 80%, rgba(15,23,42,0.8) 0%, transparent 70%),
-              var(--color-navy-900);
+  background: radial-gradient(ellipse 80% 60% at 50% -10%, var(--auth-glow-1) 0%, transparent 60%),
+              radial-gradient(ellipse 60% 40% at 80% 80%, var(--auth-glow-2) 0%, transparent 70%),
+              rgb(var(--bg-1));
 }
 
 /* OTP input digits */
 .otp-digit {
-  @apply w-10 h-12 text-center text-xl font-bold bg-navy-800/60 border border-white/10 rounded-xl
-         text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500
-         transition-all duration-150;
+  @apply w-10 h-12 text-center text-xl font-bold rounded-xl outline-none transition-all duration-150;
+  background-color: rgb(var(--input-bg) / 0.6);
+  border: 1px solid rgb(var(--input-border) / 0.6);
+  color: rgb(var(--text-1));
+}
+.otp-digit:focus {
+  border-color: rgb(var(--accent-1));
+  box-shadow: 0 0 0 1px rgb(var(--accent-1));
 }
 
 /* Status dot */
 .status-dot {
   @apply inline-block w-2 h-2 rounded-full;
 }
+
+/* ── Light-mode overrides for hardcoded dark-mode utilities ── */
+
+:root.light .text-white { color: rgb(var(--text-1)) !important; }
+:root.light .text-slate-200 { color: rgb(var(--text-1)) !important; }
+:root.light .text-slate-400 { color: rgb(var(--text-3)) !important; }
+:root.light .text-slate-500 { color: rgb(var(--text-3)) !important; }
+:root.light .text-slate-300 { color: rgb(var(--text-2)) !important; }
+
+/* Pastel accent text (designed for dark surfaces) needs a dark shade on light surfaces */
+:root.light .text-sky-200 { color: rgb(7 89 133) !important; }
+:root.light .text-violet-200 { color: rgb(109 40 217) !important; }
+:root.light .text-amber-200 { color: rgb(180 83 9) !important; }
+:root.light .text-emerald-200 { color: rgb(4 120 87) !important; }
+:root.light .text-rose-200 { color: rgb(190 18 60) !important; }
+:root.light .text-emerald-100 { color: rgb(4 120 87) !important; }
+:root.light .text-emerald-300 { color: rgb(4 120 87) !important; }
+:root.light .text-amber-300 { color: rgb(180 83 9) !important; }
+:root.light .text-rose-300 { color: rgb(190 18 60) !important; }
+:root.light .text-sky-300 { color: rgb(7 89 133) !important; }
+:root.light .text-blue-300 { color: rgb(29 78 216) !important; }
+:root.light .text-emerald-400 { color: rgb(4 120 87) !important; }
+:root.light .text-emerald-50 { color: rgb(6 95 70) !important; }
+:root.light .text-red-300 { color: rgb(185 28 28) !important; }
+:root.light .text-red-400 { color: rgb(185 28 28) !important; }
+:root.light .text-indigo-300 { color: rgb(67 56 202) !important; }
+
+/* Hover / focus variants of the same utilities */
+:root.light .hover\:text-emerald-200:hover,
+:root.light .hover\:text-emerald-300:hover,
+:root.light .hover\:text-emerald-100:hover { color: rgb(4 120 87) !important; }
+:root.light .hover\:text-red-400:hover { color: rgb(153 27 27) !important; }
+:root.light .hover\:text-slate-300:hover { color: rgb(var(--text-1)) !important; }
+:root.light .group:hover .group-hover\:text-emerald-200,
+:root.light .group:hover .group-hover\:text-emerald-300 { color: rgb(4 120 87) !important; }
+
+:root.light .bg-white\/5 { background-color: rgb(var(--surface-border) / 0.3) !important; }
+:root.light .bg-white\/10 { background-color: rgb(var(--surface-border) / 0.4) !important; }
+:root.light .bg-navy-900 { background-color: rgb(var(--bg-1)) !important; }
+:root.light .bg-navy-950 { background-color: rgb(var(--bg-1)) !important; }
+
+:root.light .border-white\/10 { border-color: rgb(var(--surface-border)) !important; }
+:root.light .border-white\/5 { border-color: rgb(var(--surface-border) / 0.6) !important; }
+
+:root.light .glass-card {
+  background-color: rgb(var(--surface) / 0.92) !important;
+  box-shadow: var(--shadow-card);
+}
+
+:root.light .btn-ghost {
+  color: rgb(var(--text-2)) !important;
+  border: 1px solid rgb(var(--surface-border) / 0.5) !important;
+}
+:root.light .btn-ghost:hover {
+  color: rgb(var(--text-1)) !important;
+  background-color: rgb(var(--text-2) / 0.06) !important;
+}
+
+:root.light header {
+  border-color: rgb(var(--surface-border)) !important;
+  background-color: rgb(var(--nav-bg)) !important;
+}
+:root.light header span { color: rgb(var(--text-1)) !important; }
+
+:root.light aside {
+  border-color: rgb(var(--surface-border)) !important;
+  background-color: rgb(var(--bg-1)) !important;
+}
+
+/* Dark mode — keep hardcoded dark utilities intact */
+:root.dark .text-white { color: #ffffff; }
+:root.dark .bg-white\/5 { background-color: rgba(255,255,255,0.05); }
+:root.dark .border-white\/10 { border-color: rgba(255,255,255,0.10); }
+

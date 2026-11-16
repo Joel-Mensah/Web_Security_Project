@@ -4,6 +4,9 @@
 
 -- Drop existing objects (safe re-run)
 DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS incident_updates CASCADE;
+DROP TABLE IF EXISTS incidents CASCADE;
+DROP TABLE IF EXISTS user_linked_accounts CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TYPE IF EXISTS user_role CASCADE;
 
@@ -67,6 +70,80 @@ CREATE INDEX idx_audit_action     ON audit_logs (action);
 CREATE INDEX idx_audit_created_at ON audit_logs (created_at DESC);
 
 -- ---------------------------------------------------------------------------
+-- TABLES: security incidents and their activity timeline
+-- ---------------------------------------------------------------------------
+CREATE TABLE incidents (
+    id                 UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    title              VARCHAR(160)  NOT NULL,
+    description        TEXT          NOT NULL,
+    category           VARCHAR(32)   NOT NULL CHECK (category IN (
+                           'suspicious_email', 'account_compromise', 'lost_device',
+                           'data_exposure', 'malware', 'policy_violation', 'other'
+                       )),
+    severity           VARCHAR(16)   NOT NULL DEFAULT 'medium' CHECK (
+                           severity IN ('low', 'medium', 'high', 'critical')
+                       ),
+    status             VARCHAR(20)   NOT NULL DEFAULT 'new' CHECK (
+                           status IN ('new', 'triaged', 'in_progress', 'resolved', 'closed')
+                       ),
+    reporter_id        UUID          REFERENCES users(id) ON DELETE SET NULL,
+    assignee_id        UUID          REFERENCES users(id) ON DELETE SET NULL,
+    resolution_summary TEXT,
+    reporter_response_at TIMESTAMPTZ,
+    referred_to_authority_at TIMESTAMPTZ,
+    created_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    resolved_at        TIMESTAMPTZ
+);
+
+CREATE INDEX idx_incidents_reporter_created
+    ON incidents (reporter_id, created_at DESC);
+CREATE INDEX idx_incidents_assignee_status
+    ON incidents (assignee_id, status, updated_at DESC);
+CREATE INDEX idx_incidents_status_severity
+    ON incidents (status, severity, updated_at DESC);
+
+CREATE TABLE incident_updates (
+    id          UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    incident_id UUID          NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    actor_id    UUID          REFERENCES users(id) ON DELETE SET NULL,
+    update_type VARCHAR(20)   NOT NULL CHECK (
+                    update_type IN ('comment', 'status', 'assignment', 'severity', 'resolution')
+                ),
+    message     TEXT          NOT NULL,
+    is_internal BOOLEAN       NOT NULL DEFAULT FALSE,
+    details     JSONB         NOT NULL DEFAULT '{}',
+    created_at  TIMESTAMPTZ   NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_incident_updates_timeline
+    ON incident_updates (incident_id, created_at);
+
+-- ---------------------------------------------------------------------------
+-- TABLE: user_linked_accounts (Integration Center / "Link This Site")
+-- ---------------------------------------------------------------------------
+CREATE TABLE user_linked_accounts (
+    id                      UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id                 UUID          NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider                VARCHAR(32)   NOT NULL CHECK (provider IN (
+                                'google', 'github', 'microsoft', 'slack', 'custom_saml'
+                            )),
+    provider_account_id     VARCHAR(255)  NOT NULL,
+    provider_email          VARCHAR(255),
+    access_token_encrypted  TEXT          NOT NULL,
+    refresh_token_encrypted TEXT,
+    metadata                JSONB         NOT NULL DEFAULT '{}',
+    created_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    updated_at              TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_linked_account_provider UNIQUE (provider, provider_account_id)
+);
+
+CREATE INDEX idx_linked_accounts_user
+    ON user_linked_accounts (user_id, provider);
+CREATE INDEX idx_linked_accounts_provider
+    ON user_linked_accounts (provider, provider_account_id);
+
+-- ---------------------------------------------------------------------------
 -- TRIGGER: auto-update updated_at on users
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -81,10 +158,24 @@ CREATE TRIGGER trg_users_updated_at
     BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE OR REPLACE FUNCTION update_incident_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_incidents_updated_at
+    BEFORE UPDATE ON incidents
+    FOR EACH ROW EXECUTE FUNCTION update_incident_updated_at_column();
+
 -- ---------------------------------------------------------------------------
 -- COMMENTS
 -- ---------------------------------------------------------------------------
 COMMENT ON TABLE users       IS 'Core user accounts. Password salt stored per-user; pepper is env-only.';
 COMMENT ON TABLE audit_logs  IS 'Immutable audit trail for all security-relevant events.';
+COMMENT ON TABLE incidents IS 'Security incident reports and triage state.';
+COMMENT ON TABLE incident_updates IS 'Public comments, private notes, and incident workflow history.';
 COMMENT ON COLUMN users.salt IS 'Hex-encoded 16-byte cryptographically random salt. Never reused.';
 COMMENT ON COLUMN users.mfa_secret IS 'Base32 speakeasy TOTP secret. Null until 2FA is set up.';

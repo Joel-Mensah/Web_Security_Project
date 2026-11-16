@@ -4,8 +4,12 @@ const mockEvents = [];
 const mockQuery = jest.fn();
 const mockLog = jest.fn();
 const mockSendAccountSetupLink = jest.fn();
-const mockEnsureCloudOnline = jest.fn();
-const mockSyncSetupToken = jest.fn();
+const mockEnsureDatabaseOnline = jest.fn();
+const mockAuthorizeRole = jest.fn((roles) => {
+  const middleware = (_req, _res, next) => next();
+  middleware.requiredRoles = roles;
+  return middleware;
+});
 
 jest.mock('../config/db', () => ({
   query: mockQuery,
@@ -26,12 +30,11 @@ jest.mock('../services/emailService', () => ({
   sendAccountSetupLink: mockSendAccountSetupLink,
 }));
 
-jest.mock('../services/syncService', () => ({
-  ensureCloudOnline: mockEnsureCloudOnline,
-  syncSetupToken: mockSyncSetupToken,
+jest.mock('../middleware/requireDatabase', () => ({
+  ensureDatabaseOnline: mockEnsureDatabaseOnline,
 }));
 
-jest.mock('../middleware/authorizeRole', () => () => (_req, _res, next) => next());
+jest.mock('../middleware/authorizeRole', () => mockAuthorizeRole);
 
 const router = require('./users');
 const summaryRoute = router.stack.find(
@@ -46,13 +49,19 @@ const deleteRoute = router.stack.find(
   (layer) => layer.route?.path === '/:id' && layer.route.methods.delete
 ).route;
 const deleteHandler = deleteRoute.stack[deleteRoute.stack.length - 1].handle;
+const usersRoute = router.stack.find(
+  (layer) => layer.route?.path === '/'
+).route;
+const usersHandler = usersRoute.stack[usersRoute.stack.length - 1].handle;
+const securityOverviewRoute = router.stack.find(
+  (layer) => layer.route?.path === '/security-overview'
+).route;
+const securityOverviewHandler =
+  securityOverviewRoute.stack[securityOverviewRoute.stack.length - 1].handle;
 
 beforeEach(() => {
   mockEvents.length = 0;
-  mockEnsureCloudOnline.mockReset().mockResolvedValue(undefined);
-  mockSyncSetupToken.mockReset().mockImplementation(async () => {
-    mockEvents.push('sync');
-  });
+  mockEnsureDatabaseOnline.mockReset().mockResolvedValue(undefined);
   mockSendAccountSetupLink.mockReset().mockImplementation(async () => {
     mockEvents.push('email');
   });
@@ -100,6 +109,62 @@ test('returns account health metrics for the dashboard', async () => {
 
   expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('COUNT(*) FILTER (WHERE is_active)'));
   expect(response.json).toHaveBeenCalledWith(metrics);
+});
+
+test('returns account security metadata without credential values', async () => {
+  const listedUser = {
+    id: '00000000-0000-0000-0000-000000000001',
+    username: 'new-user',
+    email: 'new-user@example.com',
+    role: 'inputer',
+    password_algorithm: 'Argon2id',
+    salt_present: true,
+  };
+  mockQuery.mockImplementation(async (text) => (
+    text.includes('FROM users ORDER BY created_at')
+      ? { rows: [listedUser] }
+      : { rows: [{ count: '1' }] }
+  ));
+  const response = { json: jest.fn(), status: jest.fn().mockReturnThis() };
+
+  await usersHandler({ query: {} }, response);
+
+  expect(mockQuery.mock.calls[0][0]).toContain('END AS password_algorithm');
+  expect(mockQuery.mock.calls[0][0]).toContain('AS salt_present');
+  expect(mockQuery.mock.calls[0][0]).not.toMatch(/SELECT[^]*password_hash\s*,/i);
+  expect(mockQuery.mock.calls[0][0]).not.toMatch(/SELECT[^]*,\s*salt\s+FROM/i);
+  expect(response.json).toHaveBeenCalledWith({
+    users: [listedUser],
+    total: 1,
+    page: 1,
+    pageSize: 20,
+  });
+});
+
+test('returns safe Argon2id and salt settings in the security overview', async () => {
+  process.env.SECRET_PEPPER = 'test-pepper';
+  const response = { json: jest.fn() };
+
+  await securityOverviewHandler({}, response);
+
+  expect(response.json).toHaveBeenCalledWith({
+    passwordHashing: {
+      algorithm: 'Argon2id',
+      memoryCostKiB: 65536,
+      iterations: 3,
+      parallelism: 4,
+    },
+    salt: { bytesPerUser: 16, uniquePerUser: true },
+    pepper: { configured: true, storage: 'backend environment' },
+    plaintextPasswordsRecoverable: false,
+  });
+  expect(JSON.stringify(response.json.mock.calls[0][0])).not.toContain('test-pepper');
+  delete process.env.SECRET_PEPPER;
+});
+
+test('restricts the security overview route to Admin and Administrator roles', () => {
+  expect(mockAuthorizeRole).toHaveBeenCalledWith(['admin', 'administrator']);
+  expect(securityOverviewRoute.stack).toHaveLength(2);
 });
 
 test('allows an Admin to delete an Administrator account', async () => {
@@ -188,19 +253,14 @@ test('starts the 30-minute setup link expiry after Gmail accepts the email', asy
     response
   );
 
-  const initialExpiryIndex = mockEvents.findIndex(
-    (event) => typeof event === 'string' && event.includes("INTERVAL '1 hour'")
-  );
-  const emailIndex = mockEvents.indexOf('email');
-  const finalExpiryIndex = mockEvents.findIndex(
+  const expiryIndex = mockEvents.findIndex(
     (event) => typeof event === 'string' && event.includes("INTERVAL '30 minutes'")
   );
+  const emailIndex = mockEvents.indexOf('email');
 
-  expect(initialExpiryIndex).toBeGreaterThan(-1);
-  expect(emailIndex).toBeGreaterThan(initialExpiryIndex);
-  expect(finalExpiryIndex).toBeGreaterThan(emailIndex);
-  expect(mockEvents.indexOf('sync', emailIndex)).toBeGreaterThan(finalExpiryIndex);
-  expect(mockSyncSetupToken).toHaveBeenCalledTimes(2);
+  expect(expiryIndex).toBeGreaterThan(-1);
+  expect(emailIndex).toBeGreaterThan(-1);
+  expect(expiryIndex).toBeGreaterThan(emailIndex);
   expect(response.json).toHaveBeenCalledWith({
     message: 'Password setup email sent to new-user@example.com',
   });

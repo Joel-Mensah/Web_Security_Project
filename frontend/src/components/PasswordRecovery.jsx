@@ -84,6 +84,12 @@ export default function PasswordRecovery({ initialUsername = '', onBack }) {
         </form>
       )}
 
+      <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm px-4 py-3 rounded-xl mb-4">
+        <p className="flex items-center gap-2">
+          <Mail className="w-4 h-4" />
+          {message}
+        </p>
+      </div>
       {stage === 'reset' && (
         <form onSubmit={resetPassword} className="space-y-4">
           <input

@@ -20,6 +20,14 @@ const TABLES = {
   audit_logs: [
     'id', 'user_id', 'actor_id', 'action', 'ip_address', 'details', 'created_at',
   ],
+  incidents: [
+    'id', 'title', 'description', 'category', 'severity', 'status', 'reporter_id',
+    'assignee_id', 'resolution_summary', 'created_at', 'updated_at', 'resolved_at',
+  ],
+  incident_updates: [
+    'id', 'incident_id', 'actor_id', 'update_type', 'message', 'is_internal',
+    'details', 'created_at',
+  ],
 };
 
 let remotePool;
@@ -49,13 +57,25 @@ async function applyMigration(database) {
     path.resolve(__dirname, '../../../database/sync.sql'),
     'utf8'
   );
-  await database.query(syncSql);
+  const client = await database.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock(7426119203481)');
+    await client.query(syncSql);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 async function applyMigrations() {
-  const remote = getRemotePool();
   await applyMigration(localPool);
-  await applyMigration(remote);
+  if (process.env.VERCEL !== '1') {
+    await applyMigration(getRemotePool());
+  }
   console.log('[SYNC] Database migrations applied to local and Supabase databases.');
 }
 
@@ -63,7 +83,9 @@ async function getNodeState(database) {
   const { rows } = await database.query(
     `SELECT node_id, peer_cursor, initial_sync_completed,
             bootstrap_started, bootstrap_users_done, bootstrap_audit_done,
-            bootstrap_users_cursor, bootstrap_audit_cursor
+            bootstrap_incidents_done, bootstrap_incident_updates_done,
+            bootstrap_users_cursor, bootstrap_audit_cursor,
+            bootstrap_incidents_cursor, bootstrap_incident_updates_cursor
      FROM sync_node WHERE singleton = TRUE`
   );
   if (!rows[0]) throw new Error('Sync metadata is missing; apply database/sync.sql');
@@ -161,11 +183,16 @@ async function bootstrap() {
         const { rows } = await client.query(
           `SELECT
              (SELECT COUNT(*) FROM users) AS users,
-             (SELECT COUNT(*) FROM audit_logs) AS audit_logs`
+             (SELECT COUNT(*) FROM audit_logs) AS audit_logs,
+             (SELECT COUNT(*) FROM incidents) AS incidents,
+             (SELECT COUNT(*) FROM incident_updates) AS incident_updates`
         );
-        if (Number(rows[0].users) || Number(rows[0].audit_logs)) {
+        if (
+          Number(rows[0].users) || Number(rows[0].audit_logs) ||
+          Number(rows[0].incidents) || Number(rows[0].incident_updates)
+        ) {
           throw new Error(
-            'Initial sync requires empty local users and audit_logs tables. ' +
+            'Initial sync requires empty local users, audit_logs, incidents, and incident_updates tables. ' +
             'No local data was replaced.'
           );
         }
@@ -181,6 +208,11 @@ async function bootstrap() {
 
     await importTable(remote, localPool, 'users', 'bootstrap_users_cursor', 'bootstrap_users_done');
     await importTable(remote, localPool, 'audit_logs', 'bootstrap_audit_cursor', 'bootstrap_audit_done');
+    await importTable(remote, localPool, 'incidents', 'bootstrap_incidents_cursor', 'bootstrap_incidents_done');
+    await importTable(
+      remote, localPool, 'incident_updates',
+      'bootstrap_incident_updates_cursor', 'bootstrap_incident_updates_done'
+    );
     await localPool.query(
       'UPDATE sync_node SET initial_sync_completed = TRUE WHERE singleton = TRUE'
     );
@@ -488,6 +520,14 @@ async function getOpenConflicts() {
       if (conflict.table_name === 'users') {
         const { username, email, role, is_active, mfa_enabled, last_login_at, updated_at } = payload;
         return { username, email, role, is_active, mfa_enabled, last_login_at, updated_at };
+      }
+      if (conflict.table_name === 'incidents') {
+        const { title, category, severity, status, reporter_id, assignee_id, updated_at } = payload;
+        return { title, category, severity, status, reporter_id, assignee_id, updated_at };
+      }
+      if (conflict.table_name === 'incident_updates') {
+        const { incident_id, actor_id, update_type, is_internal, created_at } = payload;
+        return { incident_id, actor_id, update_type, is_internal, created_at };
       }
       const { user_id, actor_id, action, ip_address, details, created_at } = payload;
       return { user_id, actor_id, action, ip_address, details, created_at };

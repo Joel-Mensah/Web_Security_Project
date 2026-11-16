@@ -1,3 +1,7 @@
+-- DEPRECATED: Do not run this migration for current deployments.
+-- It creates database synchronization metadata and change-capture triggers.
+-- Supabase-only deployments should apply cloud-only.sql instead.
+
 -- Non-destructive synchronization metadata and change capture.
 -- Apply this after the application schema exists on both databases.
 
@@ -9,9 +13,19 @@ CREATE TABLE IF NOT EXISTS sync_node (
     bootstrap_started       BOOLEAN NOT NULL DEFAULT FALSE,
     bootstrap_users_done    BOOLEAN NOT NULL DEFAULT FALSE,
     bootstrap_audit_done    BOOLEAN NOT NULL DEFAULT FALSE,
+    bootstrap_incidents_done BOOLEAN NOT NULL DEFAULT FALSE,
+    bootstrap_incident_updates_done BOOLEAN NOT NULL DEFAULT FALSE,
     bootstrap_users_cursor  UUID,
-    bootstrap_audit_cursor  UUID
+    bootstrap_audit_cursor  UUID,
+    bootstrap_incidents_cursor UUID,
+    bootstrap_incident_updates_cursor UUID
 );
+
+ALTER TABLE sync_node
+    ADD COLUMN IF NOT EXISTS bootstrap_incidents_done BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS bootstrap_incident_updates_done BOOLEAN NOT NULL DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS bootstrap_incidents_cursor UUID,
+    ADD COLUMN IF NOT EXISTS bootstrap_incident_updates_cursor UUID;
 
 INSERT INTO sync_node (singleton)
 VALUES (TRUE)
@@ -46,6 +60,68 @@ CREATE TABLE IF NOT EXISTS password_reset_codes (
     attempts   SMALLINT    NOT NULL DEFAULT 0 CHECK (attempts >= 0 AND attempts < 5)
 );
 
+CREATE TABLE IF NOT EXISTS incidents (
+    id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title              VARCHAR(160) NOT NULL,
+    description        TEXT NOT NULL,
+    category           VARCHAR(32) NOT NULL CHECK (category IN (
+                           'suspicious_email', 'account_compromise', 'lost_device',
+                           'data_exposure', 'malware', 'policy_violation', 'other'
+                       )),
+    severity           VARCHAR(16) NOT NULL DEFAULT 'medium' CHECK (
+                           severity IN ('low', 'medium', 'high', 'critical')
+                       ),
+    status             VARCHAR(20) NOT NULL DEFAULT 'new' CHECK (
+                           status IN ('new', 'triaged', 'in_progress', 'resolved', 'closed')
+                       ),
+    reporter_id        UUID REFERENCES users(id) ON DELETE SET NULL,
+    assignee_id        UUID REFERENCES users(id) ON DELETE SET NULL,
+    resolution_summary TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    resolved_at        TIMESTAMPTZ
+);
+
+ALTER TABLE incidents
+    ADD COLUMN IF NOT EXISTS reporter_response_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS referred_to_authority_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS incident_updates (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    incident_id UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    actor_id    UUID REFERENCES users(id) ON DELETE SET NULL,
+    update_type VARCHAR(20) NOT NULL CHECK (
+                    update_type IN ('comment', 'status', 'assignment', 'severity', 'resolution')
+                ),
+    message     TEXT NOT NULL,
+    is_internal BOOLEAN NOT NULL DEFAULT FALSE,
+    details     JSONB NOT NULL DEFAULT '{}',
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+UPDATE incidents i
+SET reporter_response_at = replies.first_reply_at
+FROM (
+    SELECT updates.incident_id, MIN(updates.created_at) AS first_reply_at
+    FROM incident_updates updates
+    JOIN users responders ON responders.id = updates.actor_id
+    WHERE updates.update_type = 'comment'
+      AND updates.is_internal = FALSE
+      AND responders.role IN ('manager', 'admin', 'administrator')
+    GROUP BY updates.incident_id
+) replies
+WHERE i.id = replies.incident_id
+  AND i.reporter_response_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_incidents_reporter_created
+    ON incidents (reporter_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_incidents_assignee_status
+    ON incidents (assignee_id, status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_incidents_status_severity
+    ON incidents (status, severity, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_incident_updates_timeline
+    ON incident_updates (incident_id, created_at);
+
 CREATE TABLE IF NOT EXISTS sync_outbox (
     id              BIGSERIAL PRIMARY KEY,
     origin_node_id  UUID NOT NULL,
@@ -74,6 +150,14 @@ CREATE TABLE IF NOT EXISTS sync_conflicts (
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     resolved_at         TIMESTAMPTZ
 );
+
+ALTER TABLE sync_outbox DROP CONSTRAINT IF EXISTS sync_outbox_table_name_check;
+ALTER TABLE sync_outbox ADD CONSTRAINT sync_outbox_table_name_check
+    CHECK (table_name IN ('users', 'audit_logs', 'incidents', 'incident_updates'));
+
+ALTER TABLE sync_conflicts DROP CONSTRAINT IF EXISTS sync_conflicts_table_name_check;
+ALTER TABLE sync_conflicts ADD CONSTRAINT sync_conflicts_table_name_check
+    CHECK (table_name IN ('users', 'audit_logs', 'incidents', 'incident_updates'));
 
 CREATE INDEX IF NOT EXISTS idx_sync_conflicts_open
     ON sync_conflicts (created_at DESC) WHERE status = 'open';
@@ -144,3 +228,18 @@ DROP TRIGGER IF EXISTS trg_sync_audit_logs ON audit_logs;
 CREATE TRIGGER trg_sync_audit_logs
     AFTER INSERT OR UPDATE OR DELETE ON audit_logs
     FOR EACH ROW EXECUTE FUNCTION capture_sync_change();
+
+DROP TRIGGER IF EXISTS trg_sync_incidents ON incidents;
+CREATE TRIGGER trg_sync_incidents
+    AFTER INSERT OR UPDATE OR DELETE ON incidents
+    FOR EACH ROW EXECUTE FUNCTION capture_sync_change();
+
+DROP TRIGGER IF EXISTS trg_sync_incident_updates ON incident_updates;
+CREATE TRIGGER trg_sync_incident_updates
+    AFTER INSERT OR UPDATE OR DELETE ON incident_updates
+    FOR EACH ROW EXECUTE FUNCTION capture_sync_change();
+
+DROP TRIGGER IF EXISTS trg_incidents_updated_at ON incidents;
+CREATE TRIGGER trg_incidents_updated_at
+    BEFORE UPDATE ON incidents
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
