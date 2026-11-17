@@ -1,8 +1,7 @@
-// src/pages/IntegrationsPage.jsx — part 1: helpers (provider cards + status)
+// Provider card data and account display helpers.
 import {
   BsGoogle, BsGithub, BsMicrosoft, BsSlack, BsPersonLock,
 } from 'react-icons/bs';
-import { CiCode } from 'react-icons/ci';
 
 export const PROVIDER_CARDS = [
   {
