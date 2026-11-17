@@ -306,10 +306,10 @@ export default function UserManagementPage() {
                     <tr key={id}>
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-white">{username}</td>
                       <td className="px-4 py-3 font-mono text-xs text-slate-300">
-                        FAKE-SALT-{label}-{index + 1}
+                        {`FAKE-SALT-${label}-${index + 1}`}<br/><span className="text-xs text-slate-400">Fake salt placeholder (not stored)</span>
                       </td>
                       <td className="break-all px-4 py-3 font-mono text-xs text-slate-300">
-                        INVALID-FAKE-HASH-{label}-{index + 1}
+                        {`FAKE-$argon2id$v=19$m=65536,t=3,p=4$${'A'.repeat(43)}$${'A'.repeat(43)}`}<br/><span className="text-xs text-slate-400">Fake Argon2id hash (placeholder)</span>
                       </td>
                     </tr>
                   );
