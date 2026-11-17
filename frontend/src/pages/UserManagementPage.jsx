@@ -8,24 +8,6 @@ import { useAuth } from '../hooks/useAuth';
 import client from '../api/client';
 import UserTable from '../components/UserTable';
 
-const HASH_DEMO_USERS = [
-  {
-    username: 'demo-alice',
-    salt: 'DEMO-SALT-ALICE-001',
-    passwordHash: 'DEMO-ONLY-ARGON2ID-HASH-ALICE-NOT-VALID',
-  },
-  {
-    username: 'demo-bob',
-    salt: 'DEMO-SALT-BOB-002',
-    passwordHash: 'DEMO-ONLY-ARGON2ID-HASH-BOB-NOT-VALID',
-  },
-  {
-    username: 'demo-casey',
-    salt: 'DEMO-SALT-CASEY-003',
-    passwordHash: 'DEMO-ONLY-ARGON2ID-HASH-CASEY-NOT-VALID',
-  },
-];
-
 function getRequestErrorMessage(err, fallback) {
   const response = err?.response;
   const data = response?.data;
@@ -296,35 +278,45 @@ export default function UserManagementPage() {
         <section className="glass-card space-y-4 p-4 sm:p-5" aria-labelledby="synthetic-hash-demo-title">
           <div>
             <h2 id="synthetic-hash-demo-title" className="font-semibold text-white">
-              Classroom demo: salted password hashes
+              Synthetic credential examples
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Fictional accounts and placeholder values only. These hash strings are intentionally invalid and are not used for authentication.
+            <p className="mt-1 text-sm text-amber-200">
+              The usernames below are from this page, but the salts and hashes are fake placeholders. They are not stored, used for sign-in, or associated with the accounts.
             </p>
           </div>
           <div className="overflow-x-auto rounded-xl border border-white/8">
             <table className="w-full min-w-[600px] text-left text-sm">
               <thead className="bg-white/[0.03]">
                 <tr className="border-b border-white/8">
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Demo account</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Synthetic salt</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Fake hash</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Account name</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Fake salt (not stored)</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Fake password hash (invalid)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {HASH_DEMO_USERS.map(({ username, salt, passwordHash }) => (
-                  <tr key={username}>
-                    <td className="whitespace-nowrap px-4 py-3 font-medium text-white">{username}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-300">{salt}</td>
-                    <td className="break-all px-4 py-3 font-mono text-xs text-slate-300">{passwordHash}</td>
+                {users.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
+                      No account names are available on this page.
+                    </td>
                   </tr>
-                ))}
+                ) : users.map(({ id, username }, index) => {
+                  const label = String(username).replace(/[^a-zA-Z0-9]/g, '-').toUpperCase();
+                  return (
+                    <tr key={id}>
+                      <td className="whitespace-nowrap px-4 py-3 font-medium text-white">{username}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-slate-300">
+                        FAKE-SALT-{label}-{index + 1}
+                      </td>
+                      <td className="break-all px-4 py-3 font-mono text-xs text-slate-300">
+                        INVALID-FAKE-HASH-{label}-{index + 1}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
-          <p className="text-xs text-slate-500">
-            Each fictional account has a different salt. Real account hashes and salts are never shown here.
-          </p>
         </section>
       )}
 
