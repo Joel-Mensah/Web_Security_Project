@@ -23,7 +23,15 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword, initia
       await onSuccess(form);
     } catch (err) {
       triggerShake();
-      onError(err?.response?.data?.message || 'Invalid credentials');
+      const response = err?.response;
+      const message = response?.data?.message || (
+        response
+          ? response.status >= 500
+            ? 'The login service is unavailable. Please try again shortly.'
+            : 'Unable to sign in. Check your username and password.'
+          : 'Unable to reach the login service. Check your connection and try again.'
+      );
+      onError(message);
     } finally {
       setLoading(false);
     }
