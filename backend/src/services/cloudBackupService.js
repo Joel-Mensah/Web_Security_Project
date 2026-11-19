@@ -41,7 +41,8 @@ function getBackupConfig() {
   if (parsedUrl.hostname === 'vercel.app' || parsedUrl.hostname.endsWith('.vercel.app')) {
     throw new Error(`SUPABASE_URL points to a Vercel deployment. ${SUPABASE_URL_HINT}`);
   }
-  if (parsedUrl.pathname !== '/' || parsedUrl.search || parsedUrl.hash) {
+  const isSupabaseProjectHost = parsedUrl.hostname.endsWith('.supabase.co');
+  if (!isSupabaseProjectHost && (parsedUrl.pathname !== '/' || parsedUrl.search || parsedUrl.hash)) {
     throw new Error('SUPABASE_URL must be the Supabase project base URL without a path, query, or fragment.');
   }
   if (!/^[a-fA-F0-9]{64}$/.test(keyHex)) {

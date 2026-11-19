@@ -125,6 +125,14 @@ test('rejects a Vercel deployment URL as the Supabase project URL', async () => 
   expect(mockCreateClient).not.toHaveBeenCalled();
 });
 
+test('normalizes Supabase project URLs with API paths to the project origin', async () => {
+  process.env.SUPABASE_URL = 'https://test-project.supabase.co/rest/v1?key=value#fragment';
+
+  await listCloudBackups();
+
+  expect(mockCreateClient.mock.calls[0][0]).toBe('https://test-project.supabase.co');
+});
+
 test('lists only backup files stored in the private bucket', async () => {
   const backups = await listCloudBackups();
 
