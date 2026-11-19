@@ -10,10 +10,10 @@ import { useAuth } from '../hooks/useAuth';
 import ThemeToggle from './ThemeToggle';
 
 const ROLE_COLORS = {
-  inputer:       'bg-slate-500/20 text-slate-300',
-  manager:       'bg-blue-500/20 text-blue-300',
-  admin:         'bg-amber-500/20 text-amber-300',
-  administrator: 'bg-emerald-500/20 text-emerald-400',
+  inputer:       'bg-slate-100 text-slate-700 dark:bg-slate-500/20 dark:text-slate-300',
+  manager:       'bg-blue-50 text-blue-800 dark:bg-blue-500/20 dark:text-blue-300',
+  admin:         'bg-amber-50 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300',
+  administrator: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-400',
 };
 
 const ROLE_LABELS = {
@@ -77,8 +77,7 @@ export default function Sidebar() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-white/5 shadow-2xl transition-transform duration-300 md:sticky md:top-0 md:z-auto md:h-screen md:max-w-none md:shrink-0 md:translate-x-0 md:shadow-none ${collapsed ? 'md:w-16' : 'md:w-64'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:flex`}
-        style={{ background: 'linear-gradient(180deg, #050c1a 0%, #0a1628 60%, #050c1a 100%)' }}
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-slate-200 bg-white shadow-2xl transition-transform duration-300 dark:border-white/5 dark:bg-navy-950 md:sticky md:top-0 md:z-auto md:h-screen md:max-w-none md:shrink-0 md:translate-x-0 md:shadow-none ${collapsed ? 'md:w-16' : 'md:w-64'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:flex`}
       >
         <div className="flex items-center gap-3 border-b border-white/5 px-4 py-5">
           {/* Jewel logo badge */}
@@ -100,7 +99,7 @@ export default function Sidebar() {
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
-            className="ml-auto rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white md:hidden"
+          className="ml-auto rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-white md:hidden"
             aria-label="Close navigation menu"
           >
             <X className="h-4 w-4" />
@@ -108,7 +107,7 @@ export default function Sidebar() {
           <button
             type="button"
             onClick={() => setCollapsed(value => !value)}
-            className="ml-auto hidden text-slate-500 transition-colors hover:text-white md:block"
+            className="ml-auto hidden text-slate-500 transition-colors hover:text-slate-900 dark:hover:text-white md:block"
             aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
           >
             {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
@@ -159,7 +158,7 @@ export default function Sidebar() {
           <button
             type="button"
             onClick={handleLogout}
-            className={`nav-item w-full hover:bg-red-500/10 hover:text-red-400 ${collapsed ? 'md:justify-center md:px-2' : ''}`}
+            className={`nav-item w-full hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-500/10 dark:hover:text-red-400 ${collapsed ? 'md:justify-center md:px-2' : ''}`}
             title={collapsed ? 'Logout' : undefined}
           >
             <LogOut className="h-4 w-4 shrink-0" />

@@ -235,7 +235,7 @@
 
 :root.light aside {
   border-color: rgb(var(--surface-border)) !important;
-  background-color: rgb(var(--bg-1)) !important;
+  background-color: rgb(var(--nav-bg)) !important;
 }
 
 /* Dark mode — keep hardcoded dark utilities intact */
