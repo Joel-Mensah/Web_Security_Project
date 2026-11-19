@@ -104,6 +104,27 @@ test('refuses to create a backup in a public bucket', async () => {
   expect(mockStorage.upload).not.toHaveBeenCalled();
 });
 
+test('reports a Supabase URL configuration hint when Storage responds with HTML', async () => {
+  mockStorage.getBucket.mockResolvedValue({
+    data: null,
+    error: { message: `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` },
+  });
+
+  await expect(listCloudBackups()).rejects.toThrow(
+    /Supabase Storage returned HTML instead of JSON.*Set SUPABASE_URL to the Supabase project URL/
+  );
+  expect(mockStorage.list).not.toHaveBeenCalled();
+});
+
+test('rejects a Vercel deployment URL as the Supabase project URL', async () => {
+  process.env.SUPABASE_URL = 'https://enterprise-auth.vercel.app';
+
+  await expect(listCloudBackups()).rejects.toThrow(
+    'SUPABASE_URL points to a Vercel deployment'
+  );
+  expect(mockCreateClient).not.toHaveBeenCalled();
+});
+
 test('lists only backup files stored in the private bucket', async () => {
   const backups = await listCloudBackups();
 

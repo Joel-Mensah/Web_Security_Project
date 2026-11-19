@@ -231,7 +231,11 @@ restore or alter database records.
 
 Backups require `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
 `SUPABASE_BACKUP_BUCKET`, and a 64-character hex `BACKUP_ENCRYPTION_KEY`.
-Create the bucket as private before using the feature.
+Set `SUPABASE_URL` to the Supabase project base URL from Project Settings >
+API (for example, `https://<project-ref>.supabase.co`), not the Vercel app URL
+or a REST endpoint. Create the bucket as private before using the feature. If
+Storage returns an HTML/JSON parsing error, check this URL in the backend's
+Vercel environment variables and redeploy.
 
 Incident reports accept up to three PNG, JPEG, or WebP screenshots, up to
 5 MB each. Use a private S3 evidence bucket with public access blocked and

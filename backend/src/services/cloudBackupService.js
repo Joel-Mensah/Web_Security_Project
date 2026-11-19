@@ -13,6 +13,12 @@ const BACKUP_TABLES = [
 ];
 const DEFAULT_BUCKET = 'enterprise-auth-backups';
 const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
+const SUPABASE_URL_HINT = 'Set SUPABASE_URL to the Supabase project URL from Project Settings > API, not a Vercel deployment URL.';
+
+function isHtmlResponseError(error) {
+  const message = error?.message || String(error);
+  return /<!doctype\s+html/i.test(message) || /Unexpected token\s+['"`]?</i.test(message);
+}
 
 function getBackupConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
@@ -32,6 +38,12 @@ function getBackupConfig() {
   if (parsedUrl.protocol !== 'https:') {
     throw new Error('SUPABASE_URL must use HTTPS.');
   }
+  if (parsedUrl.hostname === 'vercel.app' || parsedUrl.hostname.endsWith('.vercel.app')) {
+    throw new Error(`SUPABASE_URL points to a Vercel deployment. ${SUPABASE_URL_HINT}`);
+  }
+  if (parsedUrl.pathname !== '/' || parsedUrl.search || parsedUrl.hash) {
+    throw new Error('SUPABASE_URL must be the Supabase project base URL without a path, query, or fragment.');
+  }
   if (!/^[a-fA-F0-9]{64}$/.test(keyHex)) {
     throw new Error('BACKUP_ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');
   }
@@ -40,7 +52,7 @@ function getBackupConfig() {
   }
 
   return {
-    client: createClient(supabaseUrl, serviceRoleKey, {
+    client: createClient(parsedUrl.origin, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     }),
     bucket,
@@ -88,10 +100,22 @@ function encryptSnapshot(snapshot, key) {
 }
 
 async function requirePrivateBucket(supabase, bucket) {
-  const { data, error } = await supabase.storage.getBucket(bucket);
+  let result;
+  try {
+    result = await supabase.storage.getBucket(bucket);
+  } catch (error) {
+    if (isHtmlResponseError(error)) {
+      throw new Error(`Supabase Storage returned HTML instead of JSON. ${SUPABASE_URL_HINT}`);
+    }
+    throw error;
+  }
+  const { data, error } = result;
   if (error) {
+    if (isHtmlResponseError(error)) {
+      throw new Error(`Supabase Storage returned HTML instead of JSON. ${SUPABASE_URL_HINT}`);
+    }
     throw new Error(
-      `Supabase backup bucket "${bucket}" must exist and be private: ${error.message}`
+      `Supabase backup bucket "${bucket}" must exist and be private: ${error.message || String(error)}`
     );
   }
   if (data.public) {
