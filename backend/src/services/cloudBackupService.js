@@ -14,6 +14,7 @@ const BACKUP_TABLES = [
 const DEFAULT_BUCKET = 'enterprise-auth-backups';
 const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 const SUPABASE_URL_HINT = 'Set SUPABASE_URL to the Supabase project URL from Project Settings > API, not a Vercel deployment URL.';
+const SERVICE_ROLE_KEY_HINT = 'Set SUPABASE_SERVICE_ROLE_KEY to the legacy service_role JWT from Supabase Project Settings > API. Do not use the anon/publishable key or a sb_secret_ key.';
 
 function isHtmlResponseError(error) {
   const message = error?.message || String(error);
@@ -41,9 +42,15 @@ function getBackupConfig() {
   if (parsedUrl.hostname === 'vercel.app' || parsedUrl.hostname.endsWith('.vercel.app')) {
     throw new Error(`SUPABASE_URL points to a Vercel deployment. ${SUPABASE_URL_HINT}`);
   }
+  if (parsedUrl.hostname === 'supabase.com' || parsedUrl.hostname.endsWith('.supabase.com')) {
+    throw new Error(`SUPABASE_URL points to the Supabase website, not a project API. ${SUPABASE_URL_HINT}`);
+  }
   const isSupabaseProjectHost = parsedUrl.hostname.endsWith('.supabase.co');
   if (!isSupabaseProjectHost && (parsedUrl.pathname !== '/' || parsedUrl.search || parsedUrl.hash)) {
     throw new Error('SUPABASE_URL must be the Supabase project base URL without a path, query, or fragment.');
+  }
+  if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(serviceRoleKey)) {
+    throw new Error(`SUPABASE_SERVICE_ROLE_KEY is not a JWT. ${SERVICE_ROLE_KEY_HINT}`);
   }
   if (!/^[a-fA-F0-9]{64}$/.test(keyHex)) {
     throw new Error('BACKUP_ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');

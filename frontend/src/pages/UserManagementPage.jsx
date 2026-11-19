@@ -2,11 +2,73 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   UserPlus, Search, RefreshCw, ChevronLeft, ChevronRight, Loader2, Mail,
-  CheckCircle, LockKeyhole, ShieldCheck, KeyRound,
+  CheckCircle, LockKeyhole, ShieldCheck, KeyRound, Copy, Check,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import client from '../api/client';
 import UserTable, { ROLE_BADGE_CLASSES } from '../components/UserTable';
+
+function CredentialBlock({ value, label, isHash = false }) {
+  const [copied, setCopied] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  if (!value) {
+    return <span className="text-slate-500 font-mono text-xs italic">Pending setup</span>;
+  }
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <code
+          className={`font-mono text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg inline-block ${
+            expanded ? 'break-all max-w-xl whitespace-pre-wrap' : 'truncate max-w-[240px] sm:max-w-[320px]'
+          }`}
+          title={value}
+        >
+          {value}
+        </code>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="p-1.5 text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-white/10 flex-shrink-0"
+          title={`Copy full ${label}`}
+          aria-label={`Copy full ${label}`}
+        >
+          {copied ? (
+            <span className="flex items-center text-xs text-emerald-400 gap-1 font-sans">
+              <Check className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Copied</span>
+            </span>
+          ) : (
+            <Copy className="w-3.5 h-3.5" />
+          )}
+        </button>
+        {value.length > 25 && (
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="text-[11px] text-slate-400 hover:text-emerald-300 underline flex-shrink-0 ml-1"
+          >
+            {expanded ? 'Collapse' : 'View Full'}
+          </button>
+        )}
+      </div>
+      <div className="text-[11px] text-slate-500 font-sans">
+        {isHash ? (
+          <span>Argon2id Hash · {value.length} characters</span>
+        ) : (
+          <span>16-byte random salt · {value.length} hex characters</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function getRequestErrorMessage(err, fallback) {
   const response = err?.response;
@@ -280,15 +342,15 @@ export default function UserManagementPage() {
             <div>
               <h2 id="credential-security-table-title" className="font-semibold text-white flex items-center gap-2">
                 <KeyRound className="w-5 h-5 text-emerald-400" />
-                User Account Credential Metadata
+                User Account Cryptographic Credentials
               </h2>
               <p className="mt-1 text-sm text-slate-400">
-                Password hashes and salts are never exposed. This view shows only the hash algorithm and whether a salt is configured.
+                Live cryptographic credentials stored in PostgreSQL for each user account. Each account uses an immutable 16-byte random salt and an Argon2id hash computed with the server pepper.
               </p>
             </div>
             <span className="text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full font-mono flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Credentials Protected
+              Live Database Salt & Hash
             </span>
           </div>
           <div className="overflow-x-auto rounded-xl border border-white/8">
@@ -297,8 +359,8 @@ export default function UserManagementPage() {
                 <tr className="border-b border-white/8">
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">User Account</th>
                   <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Role</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Hashing Algorithm</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Salt Status</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Salt (Database)</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Argon2id Password Hash</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -317,13 +379,11 @@ export default function UserManagementPage() {
                     <td className="whitespace-nowrap px-4 py-3">
                       <span className={`role-badge border text-xs ${ROLE_BADGE_CLASSES[u.role] || ''}`}>{u.role}</span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-300">
-                      {u.password_algorithm || 'Unknown'}
+                    <td className="px-4 py-3 font-mono text-xs">
+                      <CredentialBlock value={u.salt} label="Salt" />
                     </td>
-                    <td className="px-4 py-3 text-sm">
-                      <span className={u.salt_present ? 'text-emerald-300' : 'text-slate-400'}>
-                        {u.salt_present ? 'Configured' : 'Not configured'}
-                      </span>
+                    <td className="px-4 py-3 font-mono text-xs">
+                      <CredentialBlock value={u.password_hash} label="Password Hash" isHash />
                     </td>
                   </tr>
                 ))}
