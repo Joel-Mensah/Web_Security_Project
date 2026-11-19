@@ -51,6 +51,7 @@ export default function LoginSimulationModal({
 }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+  const [runId, setRunId] = useState(0);
 
   useEffect(() => {
     if (!isOpen) {
@@ -59,39 +60,40 @@ export default function LoginSimulationModal({
       return;
     }
 
-    let isMounted = true;
+    const timers = new Set();
     let step = 0;
+    const schedule = (callback, delay) => {
+      const timer = setTimeout(() => {
+        timers.delete(timer);
+        callback();
+      }, delay);
+      timers.add(timer);
+    };
 
     const runNextStep = () => {
-      if (!isMounted) return;
       if (step < SIMULATION_STEPS.length) {
         const stepDuration = SIMULATION_STEPS[step].duration;
         step += 1;
         setCurrentStepIndex(step);
         if (step < SIMULATION_STEPS.length) {
-          setTimeout(runNextStep, stepDuration);
+          schedule(runNextStep, stepDuration);
         } else {
-          // Finished all steps
-          setTimeout(() => {
-            if (isMounted) {
-              setIsFinished(true);
-              if (onComplete && !isDemo) {
-                setTimeout(onComplete, 650);
-              }
+          schedule(() => {
+            setIsFinished(true);
+            if (onComplete && !isDemo) {
+              schedule(onComplete, 1200);
             }
           }, 400);
         }
       }
     };
 
-    // Begin sequence shortly after opening
-    const timer = setTimeout(runNextStep, 250);
+    schedule(runNextStep, 250);
 
     return () => {
-      isMounted = false;
-      clearTimeout(timer);
+      timers.forEach(clearTimeout);
     };
-  }, [isOpen, onComplete, isDemo]);
+  }, [isOpen, onComplete, isDemo, runId]);
 
   if (!isOpen) return null;
 
@@ -113,7 +115,7 @@ export default function LoginSimulationModal({
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg">Authentication in Process</h3>
                 <span className="text-[10px] font-mono uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
-                  Live Simulation
+                  {isDemo ? 'Interactive Demo' : 'Authentication Simulation'}
                 </span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
@@ -229,7 +231,7 @@ export default function LoginSimulationModal({
                 onClick={() => {
                   setCurrentStepIndex(0);
                   setIsFinished(false);
-                  setTimeout(() => setCurrentStepIndex(1), 200);
+                  setRunId((id) => id + 1);
                 }}
                 className="btn-ghost py-1 px-3 text-xs border border-slate-300 dark:border-white/10"
               >

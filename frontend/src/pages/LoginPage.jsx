@@ -2,7 +2,7 @@
 // Multi-step auth: credentials → QR setup (first time) OR TOTP verify (primary) OR Email OTP (backup) → dashboard
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, AlertCircle, Sparkles, Lock } from 'lucide-react';
+import { Shield, AlertCircle, Sparkles } from 'lucide-react';
 
 import client         from '../api/client';
 import { useAuth }    from '../hooks/useAuth';
@@ -40,23 +40,35 @@ export default function LoginPage() {
   // ── Step 1: submit credentials ──────────────────────────────────────────────
   const handleCredentials = async ({ username, password }) => {
     setError('');
-    const { data } = await client.post('/auth/login', { username, password });
-    setToken(data.pendingToken);
+    setLoading(true);
+    try {
+      const { data } = await client.post('/auth/login', { username, password });
+      setToken(data.pendingToken);
 
-    if (data.requires2FASetup) {
-      // Fetch QR
-      setLoading(true);
-      const qrRes = await client.post(
-        '/auth/setup-2fa',
-        {},
-        { headers: { Authorization: `Bearer ${data.pendingToken}` } }
-      );
-      setQrData({ qrDataUrl: qrRes.data.qrDataUrl, manualCode: qrRes.data.manualCode });
+      if (data.requires2FASetup) {
+        const qrRes = await client.post(
+          '/auth/setup-2fa',
+          {},
+          { headers: { Authorization: `Bearer ${data.pendingToken}` } }
+        );
+        setQrData({ qrDataUrl: qrRes.data.qrDataUrl, manualCode: qrRes.data.manualCode });
+        setStep('qr-setup');
+      } else if (data.requires2FA) {
+        setStep('totp');
+      }
+    } finally {
       setLoading(false);
-      setStep('qr-setup');
-    } else if (data.requires2FA) {
-      setStep('totp');
     }
+  };
+
+  const handleOpenDemo = () => {
+    setSimulation({
+      isOpen: true,
+      username: 'Demo Admin',
+      role: 'administrator',
+      isDemo: true,
+      onComplete: null,
+    });
   };
 
   const handleForgotPassword = (username) => {
@@ -147,7 +159,10 @@ export default function LoginPage() {
   let currentStage = 1;
   let statusMessage = '';
 
-  if (step === 'credentials') {
+  if (simulation.isOpen && !simulation.isDemo) {
+    currentStage = 4;
+    statusMessage = 'Second factor accepted — access granted';
+  } else if (step === 'credentials') {
     if (loading) {
       currentStage = 2;
       statusMessage = 'Executing Argon2id hash with PostgreSQL salt & pepper...';
@@ -160,16 +175,16 @@ export default function LoginPage() {
     statusMessage = 'Step 2: One-time Google Authenticator setup';
   } else if (step === 'totp') {
     if (loading) {
-      currentStage = 4;
-      statusMessage = 'Verifying TOTP code & issuing signed JWT session bearer...';
+      currentStage = 3;
+      statusMessage = 'Verifying TOTP code...';
     } else {
       currentStage = 3;
       statusMessage = 'Step 2: Enter 6-digit Google Authenticator TOTP code';
     }
   } else if (step === 'email-otp') {
     if (loading) {
-      currentStage = 4;
-      statusMessage = 'Verifying Email OTP code & issuing signed JWT session bearer...';
+      currentStage = 3;
+      statusMessage = 'Verifying email OTP code...';
     } else {
       currentStage = 3;
       statusMessage = 'Step 2: Enter 6-digit OTP code sent to your email';
@@ -282,6 +297,14 @@ export default function LoginPage() {
               ))}
             </div>
 
+            {step !== 'password-recovery' && (
+              <LoginStageTracker
+                currentStage={currentStage}
+                isVerifying={loading}
+                statusMessage={statusMessage}
+              />
+            )}
+
             {/* Error banner */}
             {error && (
               <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-300 text-sm px-4 py-3 rounded-xl mb-5 animate-fade-in">
@@ -292,12 +315,22 @@ export default function LoginPage() {
 
             {/* Render current step */}
             {step === 'credentials' && (
-              <LoginForm
-                onSuccess={handleCredentials}
-                onError={setError}
-                onForgotPassword={handleForgotPassword}
-                initialUsername={recoveryUsername}
-              />
+              <>
+                <LoginForm
+                  onSuccess={handleCredentials}
+                  onError={setError}
+                  onForgotPassword={handleForgotPassword}
+                  initialUsername={recoveryUsername}
+                />
+                <button
+                  type="button"
+                  onClick={handleOpenDemo}
+                  className="btn-ghost mt-3 flex w-full items-center justify-center gap-2 border border-emerald-500/20 text-sm text-emerald-700 dark:text-emerald-300"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Preview authentication simulator
+                </button>
+              </>
             )}
             {step === 'password-recovery' && (
               <PasswordRecovery
