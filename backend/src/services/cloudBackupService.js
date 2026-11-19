@@ -14,7 +14,7 @@ const BACKUP_TABLES = [
 const DEFAULT_BUCKET = 'enterprise-auth-backups';
 const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 const SUPABASE_URL_HINT = 'Set SUPABASE_URL to the Supabase project URL from Project Settings > API, not a Vercel deployment URL.';
-const SERVICE_ROLE_KEY_HINT = 'Set SUPABASE_SECRET_KEY to the backend secret key (sb_secret_...), or SUPABASE_SERVICE_ROLE_KEY to the legacy service_role JWT. Do not use the anon/publishable key.';
+const SERVICE_ROLE_KEY_HINT = 'For Storage, set SUPABASE_SECRET_KEY to the backend secret key (sb_secret_...) and SUPABASE_SERVICE_ROLE_KEY to the legacy service_role JWT. The JWT is required for the Authorization header. Do not use the anon/publishable key.';
 
 function isHtmlResponseError(error) {
   const message = error?.message || String(error);
@@ -23,7 +23,9 @@ function isHtmlResponseError(error) {
 
 function getBackupConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const secretKey = (process.env.SUPABASE_SECRET_KEY || '').trim();
+  const legacyServiceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const serviceRoleKey = secretKey || legacyServiceRoleKey;
   const bucket = process.env.SUPABASE_BACKUP_BUCKET || DEFAULT_BUCKET;
   const keyHex = process.env.BACKUP_ENCRYPTION_KEY || '';
 
@@ -49,10 +51,17 @@ function getBackupConfig() {
   if (!isSupabaseProjectHost && (parsedUrl.pathname !== '/' || parsedUrl.search || parsedUrl.hash)) {
     throw new Error('SUPABASE_URL must be the Supabase project base URL without a path, query, or fragment.');
   }
-  const isSecretKey = serviceRoleKey.startsWith('sb_secret_');
-  const isLegacyServiceRoleJwt = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(serviceRoleKey);
-  if (!isSecretKey && !isLegacyServiceRoleJwt) {
-    throw new Error(`The configured Supabase backup key must be a backend secret key or legacy service_role JWT. ${SERVICE_ROLE_KEY_HINT}`);
+  const isSecretKey = Boolean(secretKey);
+  const isSecretKeyFormat = secretKey.startsWith('sb_secret_');
+  const isLegacyServiceRoleJwt = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(legacyServiceRoleKey);
+  if (isSecretKey && !isSecretKeyFormat) {
+    throw new Error(`SUPABASE_SECRET_KEY must start with sb_secret_. ${SERVICE_ROLE_KEY_HINT}`);
+  }
+  if (isSecretKey && !isLegacyServiceRoleJwt) {
+    throw new Error(`SUPABASE_SERVICE_ROLE_KEY must be the legacy service_role JWT for Storage Authorization. ${SERVICE_ROLE_KEY_HINT}`);
+  }
+  if (!isSecretKey && !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(serviceRoleKey)) {
+    throw new Error(`SUPABASE_SERVICE_ROLE_KEY must be a legacy service_role JWT. ${SERVICE_ROLE_KEY_HINT}`);
   }
   if (!/^[a-fA-F0-9]{64}$/.test(keyHex)) {
     throw new Error('BACKUP_ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');
@@ -64,14 +73,13 @@ function getBackupConfig() {
   return {
     client: createClient(parsedUrl.origin, serviceRoleKey, {
       auth: { autoRefreshToken: false, persistSession: false },
-      // supabase-js uses the API key as an Authorization bearer fallback for
-      // Storage. New sb_secret_ keys are API keys, not JWTs, so send them only
-      // in apikey and let Supabase apply the service_role privileges.
+      // Storage requires a JWT in Authorization. Keep the new API key in
+      // apikey, and use the legacy service_role JWT for Authorization.
       ...(isSecretKey ? {
         global: {
           fetch: (input, init = {}) => {
             const headers = new Headers(init.headers);
-            headers.delete('Authorization');
+            headers.set('Authorization', `Bearer ${legacyServiceRoleKey}`);
             return fetch(input, { ...init, headers });
           },
         },
