@@ -83,13 +83,13 @@ export default function EmailOTPModal({
   return (
     <div className="animate-slide-up space-y-5">
       <div className="text-center">
-        <div className="inline-flex items-center justify-center w-12 h-12 bg-emerald-500/15 rounded-2xl mb-3">
-          <Mail className="w-6 h-6 text-emerald-400" />
+        <div className="inline-flex items-center justify-center w-12 h-12 bg-emerald-500/15 rounded-2xl mb-3 text-emerald-600 dark:text-emerald-400">
+          <Mail className="w-6 h-6" />
         </div>
-        <h3 className="text-lg font-semibold text-white">Email Verification</h3>
-        <p className="text-slate-400 text-sm mt-1">
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Email Verification</h3>
+        <p className="text-slate-600 dark:text-slate-400 text-sm mt-1">
           Enter the 6-digit code sent to{' '}
-          <strong className="text-emerald-400 font-mono font-medium">{maskedEmail || 'your email'}</strong>
+          <strong className="text-emerald-600 dark:text-emerald-400 font-mono font-medium">{maskedEmail || 'your email'}</strong>
         </p>
       </div>
 

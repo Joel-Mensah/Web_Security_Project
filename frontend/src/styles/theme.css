@@ -17,8 +17,8 @@
   --input-bg: 255 255 255;
   --input-border: 203 213 225;
   --shadow-card: 0 1px 3px rgb(0 0 0 / 0.08), 0 8px 24px -12px rgb(0 0 0 / 0.10);
-  --auth-glow-1: rgb(79 70 229 / 0.10);
-  --auth-glow-2: rgb(2 132 199 / 0.08);
+  --auth-glow-1: rgb(16 185 129 / 0.12);
+  --auth-glow-2: rgb(14 165 233 / 0.08);
   --scroll-track: 241 245 249;
 }
 

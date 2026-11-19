@@ -51,16 +51,27 @@ const ROLE_PERMISSIONS = {
 
 function StatCard({ icon: Icon, label, value, detail, tone = 'emerald' }) {
   const tones = {
-    emerald: 'bg-emerald-500/10 text-emerald-300',
-    blue: 'bg-blue-500/10 text-blue-300',
-    amber: 'bg-amber-500/10 text-amber-300',
-    rose: 'bg-rose-500/10 text-rose-300',
+    emerald: { bg: 'bg-emerald-500/10 text-emerald-300', glow: 'rgba(16,185,129,0.3)' },
+    blue:    { bg: 'bg-blue-500/10 text-blue-300',       glow: 'rgba(59,130,246,0.3)' },
+    amber:   { bg: 'bg-amber-500/10 text-amber-300',     glow: 'rgba(245,158,11,0.3)' },
+    rose:    { bg: 'bg-rose-500/10 text-rose-300',       glow: 'rgba(244,63,94,0.3)' },
   };
+  const t = tones[tone] || tones.emerald;
 
   return (
-    <article className="glass-card flex min-w-0 items-start gap-4 p-4 sm:p-5">
-      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${tones[tone]}`}>
-        <Icon className="h-5 w-5" />
+    <article className="glass-card glamour-card-hover flex min-w-0 items-start gap-4 p-4 sm:p-5">
+      <div
+        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+        style={{
+          background: `radial-gradient(circle, ${t.glow.replace('0.3', '0.15')} 0%, transparent 70%)`,
+        }}
+      >
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-xl ${t.bg}`}
+          style={{ boxShadow: `0 0 16px ${t.glow}` }}
+        >
+          <Icon className="h-5 w-5" />
+        </div>
       </div>
       <div className="min-w-0">
         <p className="truncate text-2xl font-bold text-white">{value}</p>
@@ -73,17 +84,22 @@ function StatCard({ icon: Icon, label, value, detail, tone = 'emerald' }) {
 
 function QuickAction({ to, icon: Icon, title, description, tone = 'emerald' }) {
   const iconTone = tone === 'amber' ? 'text-amber-300' : 'text-emerald-300';
+  const glowColor = tone === 'amber' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)';
+  const borderHover = tone === 'amber' ? 'hover:border-amber-500/40' : 'hover:border-emerald-500/40';
 
   return (
     <Link
       to={to}
-      className="group flex min-w-0 items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-emerald-500/30 hover:bg-emerald-500/[0.06]"
+      className={`group glass-card glamour-card-hover flex min-w-0 items-center gap-3 p-4 ${borderHover}`}
     >
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5">
+      <span
+        className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/5"
+        style={{ boxShadow: `0 0 14px ${glowColor}` }}
+      >
         <Icon className={`h-5 w-5 ${iconTone}`} />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block font-medium text-white">{title}</span>
+        <span className="block font-semibold text-white">{title}</span>
         <span className="mt-0.5 block text-xs text-slate-400">{description}</span>
       </span>
       <ArrowRight className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-hover:translate-x-1 group-hover:text-emerald-300" />
@@ -163,7 +179,14 @@ export default function DashboardPage() {
 
   return (
     <div className="flex-1 space-y-6 overflow-y-auto p-4 animate-fade-in sm:space-y-8 sm:p-6 lg:p-8">
-      <header className="relative overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-50 via-emerald-100 to-green-50 p-5 sm:p-7 dark:border-emerald-500/30 dark:from-emerald-900/20 dark:via-green-900/20 dark:to-emerald-900/20 shadow-sm">
+      {/* Welcome header — glamorous gradient panel */}
+      <header
+        className="relative overflow-hidden rounded-2xl border border-emerald-500/30 p-5 sm:p-7 shadow-sm"
+        style={{
+          background: 'linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(5,150,105,0.06) 50%, rgba(99,102,241,0.05) 100%)',
+          boxShadow: '0 0 40px rgba(16,185,129,0.1), inset 0 1px 0 rgba(255,255,255,0.08)',
+        }}
+      >
         <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-emerald-400/10 blur-3xl dark:bg-emerald-400/10" />
         <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
@@ -172,7 +195,7 @@ export default function DashboardPage() {
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold text-white sm:text-3xl">
-                Welcome, <span className="text-emerald-300">{displayName}</span>
+                Welcome, <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">{displayName}</span>
               </h1>
               <span className={`role-badge ${ROLE_STYLE[role] || ROLE_STYLE.inputer}`}>{role}</span>
             </div>

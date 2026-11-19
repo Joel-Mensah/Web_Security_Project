@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Trash2, CheckCircle, XCircle, Mail, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 
-const ROLE_BADGE_CLASSES = {
+export const ROLE_BADGE_CLASSES = {
   inputer:       'bg-slate-500/20 text-slate-300 border-slate-500/30',
   manager:       'bg-blue-500/20 text-blue-300 border-blue-500/30',
   admin:         'bg-amber-500/20 text-amber-300 border-amber-500/30',
@@ -77,6 +77,8 @@ export default function UserTable({
                 { label: 'User' },
                 { label: 'Email', className: 'hidden lg:table-cell' },
                 { label: 'Role' },
+                { label: 'Hashing', className: 'hidden md:table-cell' },
+                { label: 'Salt Status', className: 'hidden xl:table-cell' },
                 { label: 'MFA', className: 'hidden sm:table-cell' },
                 { label: 'Status', className: 'hidden sm:table-cell' },
                 { label: 'Last Login', className: 'hidden lg:table-cell' },
@@ -91,7 +93,7 @@ export default function UserTable({
           <tbody className="divide-y divide-white/5">
             {users.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center py-12 text-slate-500">No users found</td>
+                <td colSpan={9} className="text-center py-12 text-slate-500">No users found</td>
               </tr>
             ) : users.map(u => (
               <tr key={u.id} className="hover:bg-white/3 transition-colors group">
@@ -106,11 +108,6 @@ export default function UserTable({
                       <span className="text-xs bg-slate-500/20 text-slate-400 px-1.5 py-0.5 rounded">You</span>
                     )}
                   </div>
-                  {hasRole('admin', 'administrator') && (
-                    <p className="mt-1 pl-10 text-xs text-slate-500">
-                      {u.password_algorithm || 'Unknown'} · Salt {u.salt_present ? 'present' : 'missing'}
-                    </p>
-                  )}
                 </td>
 
                 {/* Email */}
@@ -131,6 +128,16 @@ export default function UserTable({
                   ) : (
                     <span className={`role-badge border ${ROLE_BADGE_CLASSES[u.role]}`}>{u.role}</span>
                   )}
+                </td>
+
+                {/* Safe credential metadata */}
+                <td className="hidden px-4 py-3 md:table-cell whitespace-nowrap text-slate-400">
+                  {u.password_algorithm || 'Unknown'}
+                </td>
+                <td className="hidden px-4 py-3 xl:table-cell whitespace-nowrap">
+                  <span className={u.salt_present ? 'text-emerald-400' : 'text-slate-500'}>
+                    {u.salt_present ? 'Configured' : 'Not configured'}
+                  </span>
                 </td>
 
                 {/* MFA status */}

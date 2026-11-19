@@ -2,11 +2,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   UserPlus, Search, RefreshCw, ChevronLeft, ChevronRight, Loader2, Mail,
-  CheckCircle, LockKeyhole, ShieldCheck,
+  CheckCircle, LockKeyhole, ShieldCheck, KeyRound,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import client from '../api/client';
-import UserTable from '../components/UserTable';
+import UserTable, { ROLE_BADGE_CLASSES } from '../components/UserTable';
 
 function getRequestErrorMessage(err, fallback) {
   const response = err?.response;
@@ -275,45 +275,58 @@ export default function UserManagementPage() {
       )}
 
       {canViewSecurity && (
-        <section className="glass-card space-y-4 p-4 sm:p-5" aria-labelledby="synthetic-hash-demo-title">
-          <div>
-            <h2 id="synthetic-hash-demo-title" className="font-semibold text-white">
-              Synthetic credential examples
-            </h2>
-            <p className="mt-1 text-sm text-amber-200">
-              The usernames below are from this page, but the salts and hashes are fake placeholders. They are not stored, used for sign-in, or associated with the accounts.
-            </p>
+        <section className="glass-card space-y-4 p-4 sm:p-5" aria-labelledby="credential-security-table-title">
+          <div className="flex items-start justify-between flex-wrap gap-3">
+            <div>
+              <h2 id="credential-security-table-title" className="font-semibold text-white flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-emerald-400" />
+                User Account Credential Metadata
+              </h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Password hashes and salts are never exposed. This view shows only the hash algorithm and whether a salt is configured.
+              </p>
+            </div>
+            <span className="text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full font-mono flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Credentials Protected
+            </span>
           </div>
           <div className="overflow-x-auto rounded-xl border border-white/8">
-            <table className="w-full min-w-[600px] text-left text-sm">
+            <table className="w-full min-w-[700px] text-left text-sm">
               <thead className="bg-white/[0.03]">
                 <tr className="border-b border-white/8">
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Account name</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Fake salt (not stored)</th>
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Fake password hash (invalid)</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">User Account</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Role</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Hashing Algorithm</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Salt Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="px-4 py-6 text-center text-slate-500">
-                      No account names are available on this page.
+                    <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
+                      No account records available.
                     </td>
                   </tr>
-                ) : users.map(({ id, username }, index) => {
-                  const label = String(username).replace(/[^a-zA-Z0-9]/g, '-').toUpperCase();
-                  return (
-                    <tr key={id}>
-                      <td className="whitespace-nowrap px-4 py-3 font-medium text-white">{username}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-300">
-                        {`FAKE-SALT-${label}-${index + 1}`}<br/><span className="text-xs text-slate-400">Fake salt placeholder (not stored)</span>
-                      </td>
-                      <td className="break-all px-4 py-3 font-mono text-xs text-slate-300">
-                        {`FAKE-$argon2id$v=19$m=65536,t=3,p=4$${'A'.repeat(43)}$${'A'.repeat(43)}`}<br/><span className="text-xs text-slate-400">Fake Argon2id hash (placeholder)</span>
-                      </td>
-                    </tr>
-                  );
-                })}
+                ) : users.map((u) => (
+                  <tr key={u.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="font-medium text-white">{u.username}</div>
+                      <div className="text-xs text-slate-500">{u.email}</div>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span className={`role-badge border text-xs ${ROLE_BADGE_CLASSES[u.role] || ''}`}>{u.role}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-300">
+                      {u.password_algorithm || 'Unknown'}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={u.salt_present ? 'text-emerald-300' : 'text-slate-400'}>
+                        {u.salt_present ? 'Configured' : 'Not configured'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

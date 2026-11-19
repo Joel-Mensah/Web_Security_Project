@@ -76,12 +76,27 @@ export default function Sidebar() {
         />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-white/5 bg-navy-950 shadow-2xl transition-transform duration-300 md:sticky md:top-0 md:z-auto md:h-screen md:max-w-none md:shrink-0 md:translate-x-0 md:shadow-none ${collapsed ? 'md:w-16' : 'md:w-64'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:flex`}>
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col border-r border-white/5 shadow-2xl transition-transform duration-300 md:sticky md:top-0 md:z-auto md:h-screen md:max-w-none md:shrink-0 md:translate-x-0 md:shadow-none ${collapsed ? 'md:w-16' : 'md:w-64'} ${mobileOpen ? 'translate-x-0' : '-translate-x-full'} md:flex`}
+        style={{ background: 'linear-gradient(180deg, #050c1a 0%, #0a1628 60%, #050c1a 100%)' }}
+      >
         <div className="flex items-center gap-3 border-b border-white/5 px-4 py-5">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20">
+          {/* Jewel logo badge */}
+          <div
+            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+            style={{
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.25) 0%, rgba(5,150,105,0.1) 100%)',
+              border: '1px solid rgba(16,185,129,0.4)',
+              boxShadow: '0 0 16px rgba(16,185,129,0.2), inset 0 1px 0 rgba(255,255,255,0.1)',
+            }}
+          >
             <Shield className="h-4 w-4 text-emerald-400" />
           </div>
-          {!collapsed && <span className="truncate font-bold tracking-tight text-white">EnterpriseAuth</span>}
+          {!collapsed && (
+            <span className="truncate font-bold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-500 bg-clip-text text-transparent">
+              EnterpriseAuth
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setMobileOpen(false)}
@@ -107,7 +122,7 @@ export default function Sidebar() {
               to={to}
               onClick={() => setMobileOpen(false)}
               className={({ isActive }) =>
-                `nav-item ${isActive ? 'active' : ''} ${collapsed ? 'md:justify-center md:px-2' : ''}`
+                `nav-item ${isActive ? 'active' : ''} ${collapsed ? 'md:justify-center md:px-2' : ''} glamour-card-hover relative`
               }
               title={collapsed ? label : undefined}
             >
@@ -132,7 +147,11 @@ export default function Sidebar() {
           {user && (
             <div className={`px-2 py-2 ${collapsed ? 'md:hidden' : ''}`}>
               <p className="truncate text-sm font-medium text-white">{user.username}</p>
-              <span className={`role-badge mt-1 ${ROLE_COLORS[user.role] || 'bg-slate-500/20 text-slate-300'}`}>
+              {/* Role badge with glow */}
+              <span
+                className={`role-badge mt-1 ${ROLE_COLORS[user.role] || 'bg-slate-500/20 text-slate-300'}`}
+                style={{ boxShadow: '0 0 8px rgba(16,185,129,0.15)' }}
+              >
                 {ROLE_LABELS[user.role] || user.role}
               </span>
             </div>

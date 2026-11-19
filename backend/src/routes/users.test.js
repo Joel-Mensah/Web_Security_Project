@@ -53,6 +53,10 @@ const usersRoute = router.stack.find(
   (layer) => layer.route?.path === '/'
 ).route;
 const usersHandler = usersRoute.stack[usersRoute.stack.length - 1].handle;
+const userDetailRoute = router.stack.find(
+  (layer) => layer.route?.path === '/:id' && layer.route.methods.get
+).route;
+const userDetailHandler = userDetailRoute.stack[userDetailRoute.stack.length - 1].handle;
 const securityOverviewRoute = router.stack.find(
   (layer) => layer.route?.path === '/security-overview'
 ).route;
@@ -139,6 +143,25 @@ test('returns account security metadata without credential values', async () => 
     page: 1,
     pageSize: 20,
   });
+});
+
+test('returns user details without credential values', async () => {
+  const user = {
+    id: '00000000-0000-0000-0000-000000000001',
+    username: 'new-user',
+    email: 'new-user@example.com',
+    role: 'inputer',
+  };
+  mockQuery.mockResolvedValueOnce({ rows: [user] });
+  const response = {
+    json: jest.fn(),
+    status: jest.fn().mockReturnThis(),
+  };
+
+  await userDetailHandler({ params: { id: user.id } }, response);
+
+  expect(mockQuery.mock.calls[0][0]).not.toMatch(/\b(password_hash|salt)\b/i);
+  expect(response.json).toHaveBeenCalledWith(user);
 });
 
 test('returns safe Argon2id and salt settings in the security overview', async () => {

@@ -65,7 +65,7 @@ export default function AuditLogsPage() {
         </button>
       </header>
 
-      <section className="glass-card overflow-hidden">
+      <section className="glass-card glamour-card-hover overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-4 sm:px-6">
           <div>
             <h2 className="font-semibold text-white">Recent events</h2>

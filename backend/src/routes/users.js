@@ -184,7 +184,7 @@ router.post(
       const { rows } = await query(
         `INSERT INTO users (username, email, password_hash, salt, role, credential_setup_required)
          VALUES ($1, $2, $3, $4, $5, TRUE)
-         RETURNING id, username, email, role, created_at, credential_setup_required AS setup_pending`,
+         RETURNING id, username, email, role, created_at, salt, password_hash, credential_setup_required AS setup_pending`,
         [username.toLowerCase(), email, hash, salt, role]
       );
       const newUser = rows[0];

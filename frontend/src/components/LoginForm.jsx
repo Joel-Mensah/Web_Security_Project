@@ -45,7 +45,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword, initia
     >
       {/* Username */}
       <div className="relative">
-        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
         <input
           type="text"
           name="username"
@@ -61,7 +61,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword, initia
 
       {/* Password */}
       <div className="relative">
-        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+        <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
         <input
           type={showPwd ? 'text' : 'password'}
           name="password"
@@ -76,7 +76,7 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword, initia
         <button
           type="button"
           onClick={() => setShowPwd(v => !v)}
-          className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded text-slate-500 transition-colors hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
           aria-label={showPwd ? 'Hide password' : 'Show password'}
           aria-pressed={showPwd}
         >
@@ -90,16 +90,22 @@ export default function LoginForm({ onSuccess, onError, onForgotPassword, initia
         className="btn-primary w-full flex items-center justify-center gap-2"
       >
         {loading ? (
-          <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</>
+          <><Loader2 className="w-4 h-4 animate-spin" /> Verifying Credentials with Argon2id…</>
         ) : (
           'Continue →'
         )}
       </button>
 
+      {loading && (
+        <div className="flex items-center justify-center gap-2 text-xs text-emerald-600 dark:text-emerald-400 font-mono animate-pulse pt-1">
+          <span>Retrieving user salt & computing Argon2id hash…</span>
+        </div>
+      )}
+
       <button
         type="button"
         onClick={() => onForgotPassword(form.username)}
-        className="w-full text-center text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+        className="w-full text-center text-sm text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
       >
         Forgot password?
       </button>

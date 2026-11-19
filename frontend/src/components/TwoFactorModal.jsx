@@ -31,7 +31,7 @@ function CountdownRing() {
     <div className="flex flex-col items-center gap-1 mb-6">
       <svg width="56" height="56" viewBox="0 0 56 56" className="-rotate-90">
         {/* Track */}
-        <circle cx="28" cy="28" r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="4" />
+        <circle cx="28" cy="28" r={radius} fill="none" stroke="currentColor" className="text-slate-200 dark:text-white/10" strokeWidth="4" />
         {/* Progress */}
         <circle
           cx="28" cy="28" r={radius}
@@ -44,7 +44,7 @@ function CountdownRing() {
           style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.3s ease' }}
         />
       </svg>
-      <span className={`text-xs font-mono font-semibold ${isWarning ? 'text-amber-400' : 'text-slate-400'}`}>
+      <span className={`text-xs font-mono font-semibold ${isWarning ? 'text-amber-500 dark:text-amber-400' : 'text-slate-600 dark:text-slate-400'}`}>
         {secondsLeft}s
       </span>
     </div>
@@ -96,7 +96,7 @@ export default function TwoFactorModal({ onVerify, onBack, onSwitchToEmail, load
     <div className={`animate-slide-up ${shake ? 'animate-shake' : ''}`}>
       <CountdownRing />
 
-      <p className="text-center text-slate-400 text-sm mb-6">
+      <p className="text-center text-slate-600 dark:text-slate-400 text-sm mb-6">
         Enter the 6-digit code from your authenticator app
       </p>
 
@@ -134,7 +134,7 @@ export default function TwoFactorModal({ onVerify, onBack, onSwitchToEmail, load
         <button
           type="button"
           onClick={onSwitchToEmail}
-          className="w-full text-center text-xs text-emerald-400 hover:text-emerald-300 transition-colors py-2 mb-2 flex items-center justify-center gap-1.5"
+          className="w-full text-center text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors py-2 mb-2 flex items-center justify-center gap-1.5"
         >
           <Mail className="w-3.5 h-3.5" /> Can't access authenticator? Send code to email
         </button>

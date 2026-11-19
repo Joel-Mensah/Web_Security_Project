@@ -37,37 +37,60 @@
 }
 
 @layer components {
-  /* Glass card — adapts via .dark automatically through CSS vars */
+  /* Glass card — adapts via .dark automatically through CSS vars with glamorous specular highlight */
   .glass-card {
-    @apply rounded-2xl backdrop-blur-md border shadow-2xl;
-    background-color: rgb(var(--surface) / 0.6);
-    border-color: rgb(var(--surface-border) / 0.8);
+    @apply rounded-2xl backdrop-blur-xl border transition-all duration-300;
+    background-color: rgb(var(--surface) / 0.7);
+    border-color: rgb(var(--surface-border) / 0.85);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.12);
   }
   :root.light .glass-card {
-    background-color: rgb(var(--surface) / 0.8);
-    box-shadow: var(--shadow-card);
+    background-color: rgb(var(--surface) / 0.94);
+    border-color: rgb(var(--surface-border) / 0.9);
+    box-shadow: 0 20px 40px -15px rgba(16, 185, 129, 0.08), 0 10px 25px -5px rgba(0, 0, 0, 0.04), inset 0 1px 0 0 rgba(255, 255, 255, 0.95);
   }
 
-  /* Emerald primary button (kept for backward compat) */
+  /* Glamorous interactive card hover */
+  .glamour-card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl;
+  }
+  .glamour-card-hover:hover {
+    box-shadow: 0 25px 50px -12px rgba(16, 185, 129, 0.18), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  }
+
+  /* Emerald primary button with glamorous ambient glow and shimmer */
   .btn-primary {
-    @apply bg-emerald-500 hover:bg-emerald-400 text-white font-semibold
+    @apply relative overflow-hidden text-white font-semibold
            px-6 py-3 rounded-xl transition-all duration-200
            focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-navy-900
            disabled:opacity-50 disabled:cursor-not-allowed active:scale-95;
+    background-image: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-image: linear-gradient(135deg, #34D399 0%, #10B981 100%);
+    box-shadow: 0 14px 30px -5px rgba(16, 185, 129, 0.55);
+    transform: translateY(-1px);
   }
   :root.light .btn-primary {
     @apply focus:ring-offset-white;
+    background-image: linear-gradient(135deg, #059669 0%, #047857 100%);
+    box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.35);
+  }
+  :root.light .btn-primary:hover:not(:disabled) {
+    background-image: linear-gradient(135deg, #10B981 0%, #059669 100%);
+    box-shadow: 0 14px 30px -5px rgba(5, 150, 105, 0.45);
   }
 
-  /* Brand gradient button (new — indigo/cyan per spec) */
+  /* Brand gradient button (indigo/cyan per spec) */
   .btn-brand {
     @apply text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200
            focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2
            disabled:opacity-50 disabled:cursor-not-allowed active:scale-95;
     background-image: linear-gradient(135deg, rgb(var(--accent-1)), rgb(var(--accent-2)));
-    box-shadow: 0 8px 20px -8px rgb(var(--accent-1) / 0.6);
+    box-shadow: 0 10px 25px -6px rgb(var(--accent-1) / 0.5);
   }
-  .btn-brand:hover { filter: brightness(1.08); }
+  .btn-brand:hover { filter: brightness(1.08); transform: translateY(-1px); }
 
   /* Ghost button */
   .btn-ghost {
@@ -79,7 +102,7 @@
     background-color: rgb(var(--text-2) / 0.08);
   }
 
-  /* Form input */
+  /* Form input with glamorous focus ring */
   .form-input {
     @apply w-full px-4 py-3 rounded-xl outline-none transition-all duration-200 text-sm;
     background-color: rgb(var(--input-bg) / 0.6);
@@ -88,8 +111,12 @@
   }
   .form-input::placeholder { color: rgb(var(--text-3)); }
   .form-input:focus {
-    border-color: rgb(var(--accent-1));
-    box-shadow: 0 0 0 1px rgb(var(--accent-1));
+    border-color: #10B981;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  }
+  :root.light .form-input:focus {
+    border-color: #059669;
+    box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
   }
 
   /* Role badge */
@@ -216,3 +243,47 @@
 :root.dark .bg-white\/5 { background-color: rgba(255,255,255,0.05); }
 :root.dark .border-white\/10 { border-color: rgba(255,255,255,0.10); }
 
+
+/* ── Glamorous active nav item glow bar ── */
+.nav-item.active {
+  box-shadow: inset 3px 0 0 #10B981, 0 0 12px rgba(16,185,129,0.08) !important;
+}
+
+/* ── Glamorous shimmer sweep (used on buttons/cards) ── */
+.shimmer-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-sweep::after {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%; right: 0; bottom: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.08) 50%, transparent 60%);
+  animation: shimmer 3s infinite linear;
+}
+
+/* ── Glamorous glow text for headings ── */
+.glow-text-emerald {
+  text-shadow: 0 0 20px rgba(16,185,129,0.4);
+}
+
+/* ── Jewel badge ── */
+.jewel-badge {
+  background: linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.1));
+  border: 1px solid rgba(16,185,129,0.4);
+  box-shadow: 0 0 16px rgba(16,185,129,0.2), inset 0 1px 0 rgba(255,255,255,0.12);
+}
+
+/* ── Stat card icon halo ── */
+.stat-icon-halo {
+  position: relative;
+}
+.stat-icon-halo::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, currentColor 0%, transparent 70%);
+  opacity: 0.15;
+  filter: blur(4px);
+}
