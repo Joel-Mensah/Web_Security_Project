@@ -1,7 +1,7 @@
 // src/components/LoginSimulationModal.jsx
 // Visual cryptographic authentication simulation showing real-time security verification steps
 import { useState, useEffect } from 'react';
-import { Shield, CheckCircle2, Loader2, Check, X, Terminal } from 'lucide-react';
+import { Shield, CheckCircle2, Loader2, Check, Terminal } from 'lucide-react';
 
 const SIMULATION_STEPS = [
   {
@@ -46,12 +46,9 @@ export default function LoginSimulationModal({
   username = 'Administrator',
   role = 'administrator',
   onComplete,
-  isDemo = false,
-  onClose,
 }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
-  const [runId, setRunId] = useState(0);
 
   useEffect(() => {
     if (!isOpen) {
@@ -80,7 +77,7 @@ export default function LoginSimulationModal({
         } else {
           schedule(() => {
             setIsFinished(true);
-            if (onComplete && !isDemo) {
+            if (onComplete) {
               schedule(onComplete, 1200);
             }
           }, 400);
@@ -93,7 +90,7 @@ export default function LoginSimulationModal({
     return () => {
       timers.forEach(clearTimeout);
     };
-  }, [isOpen, onComplete, isDemo, runId]);
+  }, [isOpen, onComplete]);
 
   if (!isOpen) return null;
 
@@ -115,7 +112,7 @@ export default function LoginSimulationModal({
               <div className="flex items-center gap-2">
                 <h3 className="font-bold text-slate-900 dark:text-white text-base sm:text-lg">Authentication in Process</h3>
                 <span className="text-[10px] font-mono uppercase bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold">
-                  {isDemo ? 'Interactive Demo' : 'Authentication Simulation'}
+                  Authentication
                 </span>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
@@ -123,16 +120,6 @@ export default function LoginSimulationModal({
               </p>
             </div>
           </div>
-          {isDemo && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="text-slate-400 hover:text-slate-900 dark:hover:text-white p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-              aria-label="Close simulation"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
         {/* Progress bar */}
@@ -224,28 +211,7 @@ export default function LoginSimulationModal({
             </span>
           </div>
 
-          {isFinished && isDemo ? (
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentStepIndex(0);
-                  setIsFinished(false);
-                  setRunId((id) => id + 1);
-                }}
-                className="btn-ghost py-1 px-3 text-xs border border-slate-300 dark:border-white/10"
-              >
-                Replay
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="btn-primary py-1 px-4 text-xs"
-              >
-                Done
-              </button>
-            </div>
-          ) : isFinished ? (
+          {isFinished ? (
             <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 font-mono">
               <CheckCircle2 className="w-3.5 h-3.5" /> Establishing Session…
             </span>

@@ -1,6 +1,6 @@
 // src/components/LoginStageTracker.jsx
 // Live interactive stage simulator showing real-time animated movement as the user progresses through login
-import { Lock, KeyRound, ShieldCheck, CheckCircle2, Check, ArrowRight } from 'lucide-react';
+import { Lock, KeyRound, ShieldCheck, CheckCircle2, Check } from 'lucide-react';
 
 const STAGES = [
   {
@@ -33,7 +33,7 @@ const STAGES = [
   },
 ];
 
-export default function LoginStageTracker({ currentStage = 1, isVerifying = false, statusMessage = '' }) {
+export default function LoginStageTracker({ currentStage = 1, isVerifying = false }) {
   // Determine active visual stage:
   // 1: on credentials form (not submitted)
   // 2: submitting credentials (verifying argon2id salt/hash)
@@ -59,7 +59,7 @@ export default function LoginStageTracker({ currentStage = 1, isVerifying = fals
       <div className="flex items-center justify-between mb-3 text-xs font-mono">
         <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-400">
           <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Live Auth Pipeline Simulator
+          Authentication Progress
         </span>
         <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
           Stage {currentStage} of 4
@@ -146,40 +146,6 @@ export default function LoginStageTracker({ currentStage = 1, isVerifying = fals
         </div>
       </div>
 
-      {/* Dynamic status telemetry banner */}
-      <div className="mt-3.5 pt-2.5 border-t border-slate-200/70 dark:border-white/5 flex items-center justify-between gap-2 text-xs font-mono">
-        <div className="flex items-center gap-2 truncate">
-          <ArrowRight className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-          <span className="text-slate-600 dark:text-slate-300 text-[11px] truncate">
-            {statusMessage ||
-              (currentStage === 1
-                ? 'Enter account username & password'
-                : currentStage === 2
-                ? 'Verifying Argon2id hash with PostgreSQL salt & pepper...'
-                : currentStage === 3
-                ? 'Awaiting second factor (TOTP / Email OTP)...'
-                : 'Cryptographic session established — Access granted!')}
-          </span>
-        </div>
-        {/* Glamorous status badge */}
-        <span
-          className="hidden sm:inline-block text-[10px] font-semibold px-2.5 py-0.5 rounded-full border shrink-0"
-          style={{
-            background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(5,150,105,0.08))',
-            border: '1px solid rgba(16,185,129,0.3)',
-            color: '#10B981',
-            boxShadow: '0 0 8px rgba(16,185,129,0.15)',
-          }}
-        >
-          {currentStage === 1
-            ? 'Input Stage'
-            : currentStage === 2
-            ? 'Argon2id Hash'
-            : currentStage === 3
-            ? '2FA Check'
-            : 'Authorized'}
-        </span>
-      </div>
     </div>
   );
 }

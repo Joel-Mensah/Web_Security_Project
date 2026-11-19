@@ -2,7 +2,7 @@
 // Multi-step auth: credentials → QR setup (first time) OR TOTP verify (primary) OR Email OTP (backup) → dashboard
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Shield, AlertCircle, Sparkles } from 'lucide-react';
+import { Shield, AlertCircle } from 'lucide-react';
 
 import client         from '../api/client';
 import { useAuth }    from '../hooks/useAuth';
@@ -33,7 +33,6 @@ export default function LoginPage() {
     isOpen: false,
     username: '',
     role: '',
-    isDemo: false,
     onComplete: null,
   });
 
@@ -61,16 +60,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleOpenDemo = () => {
-    setSimulation({
-      isOpen: true,
-      username: 'Demo Admin',
-      role: 'administrator',
-      isDemo: true,
-      onComplete: null,
-    });
-  };
-
   const handleForgotPassword = (username) => {
     setRecoveryUsername(username.trim());
     setError('');
@@ -95,7 +84,6 @@ export default function LoginPage() {
         isOpen: true,
         username: data.user?.username || 'User',
         role: data.user?.role || 'user',
-        isDemo: false,
         onComplete: () => {
           login(data);
           navigate('/dashboard', { replace: true });
@@ -123,7 +111,6 @@ export default function LoginPage() {
         isOpen: true,
         username: data.user?.username || 'User',
         role: data.user?.role || 'user',
-        isDemo: false,
         onComplete: () => {
           login(data);
           navigate('/dashboard', { replace: true });
@@ -157,41 +144,19 @@ export default function LoginPage() {
 
   // Live stage tracking for stage movement animation
   let currentStage = 1;
-  let statusMessage = '';
 
-  if (simulation.isOpen && !simulation.isDemo) {
+  if (simulation.isOpen) {
     currentStage = 4;
-    statusMessage = 'Second factor accepted — access granted';
   } else if (step === 'credentials') {
-    if (loading) {
-      currentStage = 2;
-      statusMessage = 'Executing Argon2id hash with PostgreSQL salt & pepper...';
-    } else {
-      currentStage = 1;
-      statusMessage = 'Step 1: Identity & Password verification';
-    }
+    currentStage = loading ? 2 : 1;
   } else if (step === 'qr-setup') {
     currentStage = 3;
-    statusMessage = 'Step 2: One-time Google Authenticator setup';
   } else if (step === 'totp') {
-    if (loading) {
-      currentStage = 3;
-      statusMessage = 'Verifying TOTP code...';
-    } else {
-      currentStage = 3;
-      statusMessage = 'Step 2: Enter 6-digit Google Authenticator TOTP code';
-    }
+    currentStage = 3;
   } else if (step === 'email-otp') {
-    if (loading) {
-      currentStage = 3;
-      statusMessage = 'Verifying email OTP code...';
-    } else {
-      currentStage = 3;
-      statusMessage = 'Step 2: Enter 6-digit OTP code sent to your email';
-    }
+    currentStage = 3;
   } else if (step === 'password-recovery') {
     currentStage = 1;
-    statusMessage = 'Account recovery in progress';
   }
 
   return (
@@ -301,7 +266,6 @@ export default function LoginPage() {
               <LoginStageTracker
                 currentStage={currentStage}
                 isVerifying={loading}
-                statusMessage={statusMessage}
               />
             )}
 
@@ -315,22 +279,12 @@ export default function LoginPage() {
 
             {/* Render current step */}
             {step === 'credentials' && (
-              <>
-                <LoginForm
-                  onSuccess={handleCredentials}
-                  onError={setError}
-                  onForgotPassword={handleForgotPassword}
-                  initialUsername={recoveryUsername}
-                />
-                <button
-                  type="button"
-                  onClick={handleOpenDemo}
-                  className="btn-ghost mt-3 flex w-full items-center justify-center gap-2 border border-emerald-500/20 text-sm text-emerald-700 dark:text-emerald-300"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  Preview authentication simulator
-                </button>
-              </>
+              <LoginForm
+                onSuccess={handleCredentials}
+                onError={setError}
+                onForgotPassword={handleForgotPassword}
+                initialUsername={recoveryUsername}
+              />
             )}
             {step === 'password-recovery' && (
               <PasswordRecovery
@@ -381,9 +335,7 @@ export default function LoginPage() {
           isOpen={simulation.isOpen}
           username={simulation.username}
           role={simulation.role}
-          isDemo={simulation.isDemo}
           onComplete={simulation.onComplete}
-          onClose={() => setSimulation(s => ({ ...s, isOpen: false }))}
         />
       )}
     </div>
