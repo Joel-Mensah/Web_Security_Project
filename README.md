@@ -93,10 +93,10 @@ set `SUPABASE_BACKUP_BUCKET` to another bucket name). Keep the service-role key
 and `BACKUP_ENCRYPTION_KEY` on the backend only. Never add them to the
 frontend environment.
 
-For `SUPABASE_SERVICE_ROLE_KEY`, use the backend secret key (`sb_secret_...`)
-or legacy `service_role` JWT from Supabase Project Settings > API. Do not use
-the anon/publishable key. New secret keys are sent through the `apikey` header
-without treating them as JWT bearer tokens.
+For backups, set `SUPABASE_SECRET_KEY` to the backend secret key (`sb_secret_...`).
+The legacy `service_role` JWT can instead be set as `SUPABASE_SERVICE_ROLE_KEY`.
+Do not use the anon/publishable key. New secret keys are sent through the
+`apikey` header without treating them as JWT bearer tokens.
 
 ### 3. Create the first Administrator, if needed
 
@@ -234,12 +234,14 @@ can roll back the production frontend and API to deployments made from the
 same Git commit. This changes deployed application code only. It does not
 restore or alter database records.
 
-Backups require `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+Backups require `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (or legacy
+`SUPABASE_SERVICE_ROLE_KEY`),
 `SUPABASE_BACKUP_BUCKET`, and a 64-character hex `BACKUP_ENCRYPTION_KEY`.
 Set `SUPABASE_URL` to the Supabase project base URL from Project Settings >
 API (for example, `https://<project-ref>.supabase.co`), not the Vercel app URL
-or a REST endpoint. Use the backend secret key (`sb_secret_...`) or legacy
-`service_role` JWT, not the anon/publishable key. Create the bucket as private
+or a REST endpoint. Set `SUPABASE_SECRET_KEY` to the backend secret key
+(`sb_secret_...`), or use the legacy `SUPABASE_SERVICE_ROLE_KEY` JWT. Do not
+use the anon/publishable key. Create the bucket as private
 before using the feature. If these values change in Vercel, redeploy the
 backend so it picks up the corrected environment variables.
 
@@ -345,7 +347,8 @@ charges in the AWS Billing console.
    and request AWS rollbacks.
 6. Add the backend environment settings in Elastic Beanstalk. Use the required
    values from `backend/.env.example`, including `SUPABASE_DATABASE_URL`,
-   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BACKUP_BUCKET`,
+   `SUPABASE_URL`, `SUPABASE_SECRET_KEY` (or legacy
+   `SUPABASE_SERVICE_ROLE_KEY`), `SUPABASE_BACKUP_BUCKET`,
    `AWS_INCIDENT_EVIDENCE_BUCKET` to `$EvidenceBucket`,
    `BACKUP_ENCRYPTION_KEY`, `JWT_SECRET`, `SECRET_PEPPER`, `GMAIL_USER`,
    `GMAIL_APP_PASSWORD`, `NODE_ENV=production`, and `FRONTEND_URL`. Also set

@@ -14,7 +14,7 @@ const BACKUP_TABLES = [
 const DEFAULT_BUCKET = 'enterprise-auth-backups';
 const MAX_BACKUP_BYTES = 50 * 1024 * 1024;
 const SUPABASE_URL_HINT = 'Set SUPABASE_URL to the Supabase project URL from Project Settings > API, not a Vercel deployment URL.';
-const SERVICE_ROLE_KEY_HINT = 'Set SUPABASE_SERVICE_ROLE_KEY to the backend secret key (sb_secret_...) or legacy service_role JWT from Supabase Project Settings > API. Do not use the anon/publishable key.';
+const SERVICE_ROLE_KEY_HINT = 'Set SUPABASE_SECRET_KEY to the backend secret key (sb_secret_...), or SUPABASE_SERVICE_ROLE_KEY to the legacy service_role JWT. Do not use the anon/publishable key.';
 
 function isHtmlResponseError(error) {
   const message = error?.message || String(error);
@@ -23,12 +23,12 @@ function isHtmlResponseError(error) {
 
 function getBackupConfig() {
   const supabaseUrl = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceRoleKey = (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
   const bucket = process.env.SUPABASE_BACKUP_BUCKET || DEFAULT_BUCKET;
   const keyHex = process.env.BACKUP_ENCRYPTION_KEY || '';
 
   if (!supabaseUrl || !serviceRoleKey) {
-    throw new Error('Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY for private cloud backups.');
+    throw new Error('Set SUPABASE_URL and either SUPABASE_SECRET_KEY or SUPABASE_SERVICE_ROLE_KEY for private cloud backups.');
   }
   let parsedUrl;
   try {
@@ -52,7 +52,7 @@ function getBackupConfig() {
   const isSecretKey = serviceRoleKey.startsWith('sb_secret_');
   const isLegacyServiceRoleJwt = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(serviceRoleKey);
   if (!isSecretKey && !isLegacyServiceRoleJwt) {
-    throw new Error(`SUPABASE_SERVICE_ROLE_KEY must be a backend secret key or legacy service_role JWT. ${SERVICE_ROLE_KEY_HINT}`);
+    throw new Error(`The configured Supabase backup key must be a backend secret key or legacy service_role JWT. ${SERVICE_ROLE_KEY_HINT}`);
   }
   if (!/^[a-fA-F0-9]{64}$/.test(keyHex)) {
     throw new Error('BACKUP_ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');
