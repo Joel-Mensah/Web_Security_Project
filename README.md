@@ -93,9 +93,10 @@ set `SUPABASE_BACKUP_BUCKET` to another bucket name). Keep the service-role key
 and `BACKUP_ENCRYPTION_KEY` on the backend only. Never add them to the
 frontend environment.
 
-For `SUPABASE_SERVICE_ROLE_KEY`, use the JWT-format `service_role` key from
-Supabase Project Settings > API (it starts with `eyJ`). The anon/publishable
-key and newer `sb_secret_` key are not accepted by this Storage client.
+For `SUPABASE_SERVICE_ROLE_KEY`, use the backend secret key (`sb_secret_...`)
+or legacy `service_role` JWT from Supabase Project Settings > API. Do not use
+the anon/publishable key. New secret keys are sent through the `apikey` header
+without treating them as JWT bearer tokens.
 
 ### 3. Create the first Administrator, if needed
 
@@ -237,10 +238,10 @@ Backups require `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
 `SUPABASE_BACKUP_BUCKET`, and a 64-character hex `BACKUP_ENCRYPTION_KEY`.
 Set `SUPABASE_URL` to the Supabase project base URL from Project Settings >
 API (for example, `https://<project-ref>.supabase.co`), not the Vercel app URL
-or a REST endpoint. Use the JWT-format `service_role` key (starts with `eyJ`),
-not the anon/publishable key or newer `sb_secret_` key. Create the bucket as
-private before using the feature. If these values change in Vercel, redeploy
-the backend so it picks up the corrected environment variables.
+or a REST endpoint. Use the backend secret key (`sb_secret_...`) or legacy
+`service_role` JWT, not the anon/publishable key. Create the bucket as private
+before using the feature. If these values change in Vercel, redeploy the
+backend so it picks up the corrected environment variables.
 
 Incident reports accept up to three PNG, JPEG, or WebP screenshots, up to
 5 MB each. Use a private S3 evidence bucket with public access blocked and
