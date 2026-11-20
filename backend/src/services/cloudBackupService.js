@@ -3,6 +3,7 @@
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const { getClient } = require('../config/db');
+const { uploadDriveBackup, listDriveBackups } = require('./googleDriveBackupService');
 
 const BACKUP_TABLES = [
   'users',
@@ -90,6 +91,22 @@ function getBackupConfig() {
   };
 }
 
+function getBackupProvider() {
+  const provider = (process.env.BACKUP_STORAGE_PROVIDER || 'google_drive').trim().toLowerCase();
+  if (!['supabase', 'google_drive'].includes(provider)) {
+    throw new Error('BACKUP_STORAGE_PROVIDER must be either supabase or google_drive.');
+  }
+  return provider;
+}
+
+function getEncryptionKey() {
+  const keyHex = process.env.BACKUP_ENCRYPTION_KEY || '';
+  if (!/^[a-fA-F0-9]{64}$/.test(keyHex)) {
+    throw new Error('BACKUP_ENCRYPTION_KEY must be a 64-character hex string (32 bytes).');
+  }
+  return Buffer.from(keyHex, 'hex');
+}
+
 async function readDatabaseSnapshot() {
   const client = await getClient();
   try {
@@ -159,8 +176,10 @@ function createBackupName(date = new Date()) {
 }
 
 async function createCloudBackup() {
-  const { client: supabase, bucket, encryptionKey } = getBackupConfig();
-  await requirePrivateBucket(supabase, bucket);
+  const provider = getBackupProvider();
+  const encryptionKey = getEncryptionKey();
+  const supabaseConfig = provider === 'supabase' ? getBackupConfig() : null;
+  if (supabaseConfig) await requirePrivateBucket(supabaseConfig.client, supabaseConfig.bucket);
   const createdAt = new Date();
   const tables = await readDatabaseSnapshot();
   const encrypted = encryptSnapshot({
@@ -179,13 +198,15 @@ async function createCloudBackup() {
   }
 
   const name = createBackupName(createdAt);
-  const { error } = await supabase.storage.from(bucket).upload(name, encrypted, {
-    contentType: 'application/octet-stream',
-    cacheControl: '0',
-    upsert: false,
-  });
-  if (error) {
-    throw new Error(`Supabase Storage rejected the backup: ${error.message}`);
+  if (provider === 'google_drive') {
+    await uploadDriveBackup(name, encrypted);
+  } else {
+    const { error } = await supabaseConfig.client.storage.from(supabaseConfig.bucket).upload(name, encrypted, {
+      contentType: 'application/octet-stream',
+      cacheControl: '0',
+      upsert: false,
+    });
+    if (error) throw new Error(`Supabase Storage rejected the backup: ${error.message}`);
   }
 
   return {
@@ -199,6 +220,8 @@ async function createCloudBackup() {
 }
 
 async function listCloudBackups() {
+  const provider = getBackupProvider();
+  if (provider === 'google_drive') return listDriveBackups();
   const { client: supabase, bucket } = getBackupConfig();
   await requirePrivateBucket(supabase, bucket);
   const { data, error } = await supabase.storage.from(bucket).list('', {

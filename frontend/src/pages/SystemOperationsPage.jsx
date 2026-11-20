@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  AlertCircle, CheckCircle, Clock3, Database, Loader2, RefreshCw,
-  RotateCcw, ShieldCheck,
+  AlertCircle, CheckCircle, Clock3, Database, Loader2, RefreshCw, ShieldCheck,
 } from 'lucide-react';
 import client from '../api/client';
 
@@ -30,15 +29,10 @@ function readableBytes(bytes) {
 
 export default function SystemOperationsPage() {
   const [backups, setBackups] = useState([]);
-  const [restorePoints, setRestorePoints] = useState([]);
   const [backupsLoading, setBackupsLoading] = useState(true);
-  const [restorePointsLoading, setRestorePointsLoading] = useState(true);
   const [backupError, setBackupError] = useState('');
-  const [restoreError, setRestoreError] = useState('');
   const [backupMessage, setBackupMessage] = useState('');
-  const [restoreMessage, setRestoreMessage] = useState('');
   const [creatingBackup, setCreatingBackup] = useState(false);
-  const [restoringSha, setRestoringSha] = useState('');
 
   const loadBackups = useCallback(async () => {
     setBackupsLoading(true);
@@ -53,23 +47,7 @@ export default function SystemOperationsPage() {
     }
   }, []);
 
-  const loadRestorePoints = useCallback(async () => {
-    setRestorePointsLoading(true);
-    setRestoreError('');
-    try {
-      const { data } = await client.get('/system/restore-points');
-      setRestorePoints(data.restorePoints);
-    } catch (error) {
-      setRestoreError(getErrorMessage(error, 'Could not load application restore points.'));
-    } finally {
-      setRestorePointsLoading(false);
-    }
-  }, []);
-
-  const refresh = useCallback(() => {
-    loadBackups();
-    loadRestorePoints();
-  }, [loadBackups, loadRestorePoints]);
+  const refresh = loadBackups;
 
   useEffect(() => {
     refresh();
@@ -90,34 +68,6 @@ export default function SystemOperationsPage() {
     }
   };
 
-  const restoreApplication = async (point) => {
-    const shortSha = point.commitSha.slice(0, 8);
-    const confirmed = window.confirm(
-      `Restore both the web application and API to commit ${shortSha}? This rolls back application code only. It will not restore or change database records.`
-    );
-    if (!confirmed) return;
-
-    setRestoringSha(point.commitSha);
-    setRestoreError('');
-    setRestoreMessage('');
-    try {
-      const { data } = await client.post('/system/restore-points', {
-        commitSha: point.commitSha,
-      });
-      setRestoreMessage(data.message);
-      await loadRestorePoints();
-    } catch (error) {
-      const succeeded = error?.response?.data?.succeeded || [];
-      const prefix = succeeded.length
-        ? `AWS started rollback for ${succeeded.join(' and ')}. `
-        : '';
-      setRestoreError(`${prefix}${getErrorMessage(error, 'Could not restore the application version.')}`);
-      if (succeeded.length) await loadRestorePoints();
-    } finally {
-      setRestoringSha('');
-    }
-  };
-
   return (
     <div className="flex-1 space-y-6 overflow-y-auto p-4 animate-fade-in sm:space-y-8 sm:p-6 lg:p-8">
       <header className="flex flex-wrap items-start justify-between gap-4">
@@ -132,16 +82,16 @@ export default function SystemOperationsPage() {
             System operations
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">
-            Create encrypted database backups in private Supabase Storage or roll back the deployed web app and API.
+            Create encrypted database backups in Google Drive. Roll back application deployments from Vercel.
           </p>
         </div>
         <button
           type="button"
           onClick={refresh}
-          disabled={backupsLoading || restorePointsLoading}
+          disabled={backupsLoading}
           className="btn-ghost flex items-center gap-2 border border-white/10"
         >
-          <RefreshCw className={`h-4 w-4 ${backupsLoading || restorePointsLoading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-4 w-4 ${backupsLoading ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </header>
@@ -151,7 +101,7 @@ export default function SystemOperationsPage() {
           <div>
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200">
               <Database className="h-3.5 w-3.5" />
-              Supabase database backup
+              Encrypted database backup
             </div>
             <h2 className="text-lg font-semibold text-white sm:text-xl dark:text-white">Create an encrypted backup now</h2>
             <p className="mt-1 max-w-2xl text-sm text-slate-900 dark:text-slate-400">
@@ -185,7 +135,7 @@ export default function SystemOperationsPage() {
       <section className="glass-card overflow-hidden">
         <div className="border-b border-white/5 px-4 py-4 sm:px-6">
           <h2 className="font-semibold text-white">Cloud backups</h2>
-          <p className="mt-1 text-xs text-slate-500">Encrypted backup files in the configured private Supabase bucket.</p>
+          <p className="mt-1 text-xs text-slate-500">Encrypted backup files in the configured private cloud folder.</p>
         </div>
         {backupsLoading ? (
           <div className="space-y-3 p-4 sm:p-6" aria-label="Loading backups">
@@ -215,59 +165,14 @@ export default function SystemOperationsPage() {
         )}
       </section>
 
-      <section className="glass-card overflow-hidden">
-        <div className="border-b border-white/5 px-4 py-4 sm:px-6">
-          <h2 className="font-semibold text-white">Application restore points</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Restoring changes the active AWS frontend and API releases. It does not restore or change database records.
-          </p>
-        </div>
-        {restoreMessage && (
-          <p role="status" className="m-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200 sm:m-6">
-            {restoreMessage}
-          </p>
-        )}
-        {restoreError && (
-          <p role="alert" className="m-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300 sm:m-6">
-            {restoreError}
-          </p>
-        )}
-        {restorePointsLoading ? (
-          <div className="space-y-3 p-4 sm:p-6" aria-label="Loading application restore points">
-            {Array.from({ length: 3 }, (_, index) => <div key={index} className="skeleton h-16 rounded-xl" />)}
-          </div>
-        ) : restoreError && restorePoints.length === 0 ? (
-          <p className="px-5 py-8 text-sm text-slate-400">Restore points are unavailable until AWS access is configured.</p>
-        ) : restorePoints.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-slate-400">
-            No AWS restore points were found. Deploy a release to AWS to create the first restore point.
-          </p>
-        ) : (
-          <ul className="divide-y divide-white/5">
-            {restorePoints.map((point) => (
-              <li key={point.commitSha} className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                <div className="min-w-0">
-                  <p className="font-mono text-sm font-semibold text-white">{point.commitSha.slice(0, 12)}</p>
-                  <p className="mt-1 text-xs text-slate-400">AWS frontend and API release</p>
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
-                    <Clock3 className="h-3.5 w-3.5" /> {formatDate(point.createdAt)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => restoreApplication(point)}
-                  disabled={Boolean(restoringSha)}
-                  className="btn-ghost inline-flex items-center justify-center gap-2 border border-white/10 disabled:opacity-50"
-                >
-                  {restoringSha === point.commitSha
-                    ? <Loader2 className="h-4 w-4 animate-spin" />
-                    : <RotateCcw className="h-4 w-4" />}
-                  {restoringSha === point.commitSha ? 'Restoring…' : 'Restore app version'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+      <section className="glass-card p-5 sm:p-6">
+        <h2 className="font-semibold text-white">Application rollback</h2>
+        <p className="mt-2 text-sm text-slate-400">
+          To restore an earlier web or API version, open your project in Vercel, go to Deployments, select the earlier deployment, and choose Promote to Production.
+        </p>
+        <a className="mt-4 inline-flex text-sm font-medium text-emerald-300 hover:text-emerald-200" href="https://vercel.com/dashboard" target="_blank" rel="noreferrer">
+          Open Vercel dashboard
+        </a>
       </section>
     </div>
   );
