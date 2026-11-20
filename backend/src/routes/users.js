@@ -63,9 +63,15 @@ router.get(
       const page     = Math.max(1, parseInt(req.query.page  || '1',  10));
       const pageSize = Math.min(100, parseInt(req.query.limit || '20', 10));
       const offset   = (page - 1) * pageSize;
+      // Credential verifiers are exposed only to the Admin/Administrator view.
+      // Managers still receive algorithm and salt-presence metadata, never values.
+      const credentialColumns = ['admin', 'administrator'].includes(req.user?.role)
+        ? 'password_hash, salt,'
+        : '';
 
       const { rows }       = await query(
         `SELECT id, username, email, role, mfa_enabled, is_active, last_login_at, created_at,
+                ${credentialColumns}
                 (credential_setup_required AND is_active) AS setup_pending,
                 CASE
                   WHEN password_hash LIKE '$argon2id$%' THEN 'Argon2id'

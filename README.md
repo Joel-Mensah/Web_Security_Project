@@ -225,8 +225,11 @@ npm run backup
 The command creates an AES-256-GCM encrypted snapshot and uploads it to the
 configured private Supabase Storage bucket. The administrator dashboard also
 has a button to start a backup and view backup history. The backup includes
-account, linked-account, password-reset, audit, and incident records. It does not expose
-password hashes, salts, or other credential data in the dashboard.
+account, linked-account, password-reset, audit, and incident records. Backup
+history does not display credential contents. The User Management credential
+panel displays stored password hashes and salts to Admin and Administrator
+roles for security auditing; these values can enable offline password-guessing
+attempts and must be handled as sensitive data.
 
 The administrator dashboard lists saved backups and lets an administrator
 restore the database from one. Restoring replaces the current application
