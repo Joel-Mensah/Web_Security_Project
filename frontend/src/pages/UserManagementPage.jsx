@@ -415,7 +415,7 @@ export default function UserManagementPage() {
                             type="button"
                             onClick={() => toggleCredentialValues(u.id)}
                             disabled={credentialLoading[u.id]}
-                            className="text-xs text-emerald-300 hover:text-emerald-200 disabled:opacity-50"
+                            className="text-xs font-bold text-emerald-300 hover:text-emerald-200 disabled:opacity-50"
                           >
                             {credentialLoading[u.id]
                               ? 'Loading…'
