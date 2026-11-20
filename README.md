@@ -5,8 +5,7 @@ A production-grade, full-stack web application featuring:
 - **TOTP-based 2FA** (Google Authenticator / Authy compatible)
 - **Role-Based Access Control** — Inputer, Manager, Admin, Administrator
 - **Security incident reporting** — triage queue, severity, assignments, private notes, and response timeline
-- **Encrypted database backups** in a private Google Drive folder or Supabase Storage
-- **Vercel deployment rollback** through Vercel deployment history
+- **Encrypted database backups and database restore** in private Supabase Storage
 - **React + Tailwind** glassmorphism UI with animated 2FA modal
 
 ---
@@ -88,14 +87,12 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Backups use Google Drive by default. Enable the Google Drive API in a Google
-Cloud project, create an OAuth client and refresh token with Drive access, and
-create a private Drive folder. Set the OAuth credentials, folder ID, and
-`BACKUP_ENCRYPTION_KEY` in the backend environment. Keep these values out of the
-frontend environment. Set `BACKUP_STORAGE_PROVIDER=supabase` only if you want
-to use Supabase Storage instead.
+Create a private Supabase Storage bucket named `enterprise-auth-backups` (or
+set `SUPABASE_BACKUP_BUCKET` to another bucket name). Keep the service-role key
+and `BACKUP_ENCRYPTION_KEY` on the backend only. Never add them to the
+frontend environment.
 
-If you select Supabase Storage for backups, set `SUPABASE_SECRET_KEY` to the backend secret key (`sb_secret_...`)
+For backups, set `SUPABASE_SECRET_KEY` to the backend secret key (`sb_secret_...`)
 and `SUPABASE_SERVICE_ROLE_KEY` to the legacy `service_role` JWT. Storage
 requires the JWT in `Authorization`; the new secret key is sent separately in
 `apikey`. Do not use the anon/publishable key.
@@ -226,16 +223,17 @@ npm run backup
 ```
 
 The command creates an AES-256-GCM encrypted snapshot and uploads it to the
-configured Google Drive folder. The administrator dashboard also
+configured private Supabase Storage bucket. The administrator dashboard also
 has a button to start a backup and view backup history. The backup includes
-account, password-reset, audit, and incident records. It does not expose
+account, linked-account, password-reset, audit, and incident records. It does not expose
 password hashes, salts, or other credential data in the dashboard.
 
-Application deployments are separate from database backups. Roll back the
-production application from the Vercel project's Deployments page by promoting
-an earlier deployment. This changes deployed application code only.
+The administrator dashboard lists saved backups and lets an administrator
+restore the database from one. Restoring replaces the current application
+tables with the selected snapshot; confirm the filename and date before
+proceeding. Restore runs transactionally, so a failed restore rolls back.
 
-For the alternate Supabase destination, backups require `SUPABASE_URL`, `SUPABASE_SECRET_KEY` and
+Backups and restores require `SUPABASE_URL`, `SUPABASE_SECRET_KEY` and
 `SUPABASE_SERVICE_ROLE_KEY` (legacy `service_role` JWT),
 `SUPABASE_BACKUP_BUCKET`, and a 64-character hex `BACKUP_ENCRYPTION_KEY`.
 Set `SUPABASE_URL` to the Supabase project base URL from Project Settings >
@@ -243,10 +241,7 @@ API (for example, `https://<project-ref>.supabase.co`), not the Vercel app URL
 or a REST endpoint. Set `SUPABASE_SECRET_KEY` to the backend secret key
 (`sb_secret_...`) and `SUPABASE_SERVICE_ROLE_KEY` to the legacy service role
 JWT. Do not use the anon/publishable key. Create the bucket as private
-before using the feature. For Google Drive, set `BACKUP_STORAGE_PROVIDER` to
-`google_drive` and provide `GOOGLE_DRIVE_CLIENT_ID`,
-`GOOGLE_DRIVE_CLIENT_SECRET`, `GOOGLE_DRIVE_REFRESH_TOKEN`, and
-`GOOGLE_DRIVE_BACKUP_FOLDER_ID`. If these values change in Vercel, redeploy the
+before using the feature. If these values change in Vercel, redeploy the
 backend so it picks up the corrected environment variables.
 
 Incident reports accept up to three PNG, JPEG, or WebP screenshots, up to
@@ -275,9 +270,7 @@ When omitted, the email link uses `FRONTEND_URL`. The Gmail sender's
 
 The AWS setup keeps PostgreSQL on Supabase. Elastic Beanstalk runs the Express
 API, and a private S3 bucket plus CloudFront serves the React app and stores
-release files. CloudFront sends `/api/*` requests to the API. Application
-deployment is separate from database backups. Application rollbacks for the
-Vercel deployment are managed through Vercel's deployment history.
+release files. CloudFront sends `/api/*` requests to the API.
 
 The AWS deployment workflow is manual (`workflow_dispatch`) so publishing a
 commit to `main` can trigger Vercel without starting an AWS production deploy.
@@ -365,13 +358,8 @@ charges in the AWS Billing console.
    tab. Verify login, 2FA, email setup links, user management, and incident
    reports on the CloudFront URL before directing users to it.
 
-The Vercel project's deployment history is the source for application
-rollbacks. AWS deployment infrastructure documented above is a separate
-deployment option; it is separate from the Vercel rollback instructions.
-
-The backend stores encrypted database backups in the configured private cloud destination.
-Application release history is managed by the deployment provider. Set up the
-private cloud destination and `BACKUP_ENCRYPTION_KEY` as described in
+The backend stores encrypted database backups in private Supabase Storage. Set
+up the private Supabase bucket and `BACKUP_ENCRYPTION_KEY` as described in
 [Encrypted Backups](#-encrypted-backups).
 AWS charges for the running Beanstalk environment, S3 storage, and CloudFront
 traffic. Check your account budget before enabling production resources.
@@ -399,9 +387,9 @@ so it does not need a local PostgreSQL server or a database sync process.
 | Security headers | Helmet.js |
 | SQL injection | Parameterised queries (`pg` pool) |
 | Backup encryption | AES-256-GCM with random per-backup IV and authentication tag |
-| Backup destination | AES-256-GCM encrypted snapshots in a private Google Drive folder |
+| Backup destination | AES-256-GCM encrypted snapshots in private Supabase Storage |
 | Database | Hosted Supabase PostgreSQL for local development and production |
-| Application rollback | Promote a prior deployment from the Vercel Deployments page |
+| Database restore | Transactional restore from an encrypted Supabase Storage backup |
 | Audit logging | All auth events + role changes written to `audit_logs` |
 
 ---
@@ -426,4 +414,5 @@ so it does not need a local PostgreSQL server or a database sync process.
 | GET  | `/api/users/logs/audit` | JWT | Administrator |
 | GET | `/api/system/backups` | JWT | Administrator |
 | POST | `/api/system/backups` | JWT | Administrator |
+| POST | `/api/system/backups/:name/restore` | JWT | Administrator |
 | GET  | `/health` | None | — |
