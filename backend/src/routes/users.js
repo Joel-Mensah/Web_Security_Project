@@ -63,15 +63,8 @@ router.get(
       const page     = Math.max(1, parseInt(req.query.page  || '1',  10));
       const pageSize = Math.min(100, parseInt(req.query.limit || '20', 10));
       const offset   = (page - 1) * pageSize;
-      // Credential verifiers are exposed only to the Admin/Administrator view.
-      // Managers still receive algorithm and salt-presence metadata, never values.
-      const credentialColumns = ['admin', 'administrator'].includes(req.user?.role)
-        ? 'password_hash, salt,'
-        : '';
-
       const { rows }       = await query(
         `SELECT id, username, email, role, mfa_enabled, is_active, last_login_at, created_at,
-                ${credentialColumns}
                 (credential_setup_required AND is_active) AS setup_pending,
                 CASE
                   WHEN password_hash LIKE '$argon2id$%' THEN 'Argon2id'
@@ -88,6 +81,44 @@ router.get(
     } catch (err) {
       console.error('[USERS] GET / error:', err.message);
       res.status(500).json({ message: 'Internal server error' });
+    }
+  }
+);
+
+// Return one account's stored credential verifiers only on explicit admin request.
+router.get(
+  '/:id/credential-material',
+  authorizeRole(['admin', 'administrator']),
+  [param('id').isUUID()],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+
+    try {
+      const { rows } = await query(
+        'SELECT id, username, password_hash, salt FROM users WHERE id = $1',
+        [req.params.id]
+      );
+      if (!rows[0]) return res.status(404).json({ message: 'User not found' });
+
+      // Do not disclose credential material unless the access event is recorded.
+      await query(
+        `INSERT INTO audit_logs (user_id, actor_id, action, ip_address, details)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          rows[0].id,
+          req.user.id,
+          AuditAction.USER_CREDENTIALS_VIEWED,
+          getIp(req),
+          JSON.stringify({ username: rows[0].username }),
+        ]
+      );
+
+      res.set('Cache-Control', 'no-store');
+      res.json({ password_hash: rows[0].password_hash, salt: rows[0].salt });
+    } catch (err) {
+      console.error('[USERS] Credential material request failed:', err.message);
+      res.status(500).json({ message: 'Could not load credential details' });
     }
   }
 );

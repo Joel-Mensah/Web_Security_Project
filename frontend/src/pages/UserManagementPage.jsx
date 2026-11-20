@@ -12,6 +12,10 @@ function CredentialBlock({ value, label, isHash = false }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
+  if (value === undefined) {
+    return <span className="text-slate-500 font-mono text-xs italic">Reveal from account row</span>;
+  }
+
   if (!value) {
     return <span className="text-slate-500 font-mono text-xs italic">Pending setup</span>;
   }
@@ -190,6 +194,9 @@ export default function UserManagementPage() {
   const [total, setTotal]     = useState(0);
   const [showAdd, setShowAdd] = useState(false);
   const [setupLinkState, setSetupLinkState] = useState({});
+  const [credentialValues, setCredentialValues] = useState({});
+  const [credentialLoading, setCredentialLoading] = useState({});
+  const [credentialErrors, setCredentialErrors] = useState({});
   const PAGE_SIZE = 20;
 
   const canAdd    = hasRole('manager', 'administrator');
@@ -198,6 +205,8 @@ export default function UserManagementPage() {
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
+    setCredentialValues({});
+    setCredentialErrors({});
     try {
       const { data } = await client.get(`/users?page=${page}&limit=${PAGE_SIZE}`);
       setUsers(data.users); setTotal(data.total);
@@ -214,6 +223,31 @@ export default function UserManagementPage() {
       .then(({ data }) => setSecurityOverview(data))
       .catch(() => setSecurityError('Password protection details are unavailable.'));
   }, [canViewSecurity]);
+
+  const toggleCredentialValues = async (userId) => {
+    if (credentialValues[userId]) {
+      setCredentialValues((current) => {
+        const next = { ...current };
+        delete next[userId];
+        return next;
+      });
+      return;
+    }
+
+    setCredentialLoading((current) => ({ ...current, [userId]: true }));
+    setCredentialErrors((current) => ({ ...current, [userId]: '' }));
+    try {
+      const { data } = await client.get(`/users/${userId}/credential-material`);
+      setCredentialValues((current) => ({ ...current, [userId]: data }));
+    } catch (err) {
+      setCredentialErrors((current) => ({
+        ...current,
+        [userId]: getRequestErrorMessage(err, 'Could not reveal credential values'),
+      }));
+    } finally {
+      setCredentialLoading((current) => ({ ...current, [userId]: false }));
+    }
+  };
 
   const handleDelete = async (id) => {
     try {
@@ -345,7 +379,7 @@ export default function UserManagementPage() {
                 User Account Cryptographic Credentials
               </h2>
               <p className="mt-1 text-sm text-slate-400">
-                Live cryptographic credentials stored in PostgreSQL for each user account. Each account uses an immutable 16-byte random salt and an Argon2id hash computed with the server pepper.
+                Reveal one account at a time when needed for an audit. Each reveal is logged. Hashes and salts are sensitive verifier data; never share or store copied values insecurely.
               </p>
             </div>
             <span className="text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full font-mono flex items-center gap-1.5">
@@ -375,15 +409,34 @@ export default function UserManagementPage() {
                     <td className="whitespace-nowrap px-4 py-3">
                       <div className="font-medium text-white">{u.username}</div>
                       <div className="text-xs text-slate-500">{u.email}</div>
+                      {canViewSecurity && (
+                        <div className="mt-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleCredentialValues(u.id)}
+                            disabled={credentialLoading[u.id]}
+                            className="text-xs text-emerald-300 hover:text-emerald-200 disabled:opacity-50"
+                          >
+                            {credentialLoading[u.id]
+                              ? 'Loading…'
+                              : credentialValues[u.id] ? 'Hide credentials' : 'Reveal credentials'}
+                          </button>
+                          {credentialErrors[u.id] && (
+                            <p className="mt-1 max-w-xs whitespace-normal text-xs text-red-300" role="alert">
+                              {credentialErrors[u.id]}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3">
                       <span className={`role-badge border text-xs ${ROLE_BADGE_CLASSES[u.role] || ''}`}>{u.role}</span>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">
-                      <CredentialBlock value={u.salt} label="Salt" />
+                      <CredentialBlock value={credentialValues[u.id]?.salt} label="Salt" />
                     </td>
                     <td className="px-4 py-3 font-mono text-xs">
-                      <CredentialBlock value={u.password_hash} label="Password Hash" isHash />
+                      <CredentialBlock value={credentialValues[u.id]?.password_hash} label="Password Hash" isHash />
                     </td>
                   </tr>
                 ))}

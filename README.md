@@ -226,10 +226,10 @@ The command creates an AES-256-GCM encrypted snapshot and uploads it to the
 configured private Supabase Storage bucket. The administrator dashboard also
 has a button to start a backup and view backup history. The backup includes
 account, linked-account, password-reset, audit, and incident records. Backup
-history does not display credential contents. The User Management credential
-panel displays stored password hashes and salts to Admin and Administrator
-roles for security auditing; these values can enable offline password-guessing
-attempts and must be handled as sensitive data.
+history does not display credential contents. Admin and Administrator roles
+can reveal one account's stored password hash and salt on demand from User
+Management; each reveal is recorded in the audit log. These values can enable
+offline password-guessing attempts and must be handled as sensitive data.
 
 The administrator dashboard lists saved backups and lets an administrator
 restore the database from one. Restoring replaces the current application
